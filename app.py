@@ -78,6 +78,14 @@ VEL_MAX = 600.0         # px/s; acima disso e glitch de deteccao (real vai ate ~
 MAX_FALHAS_ARREMESSO = 12   # ~1 minuto de tentativas
 HOTKEY_PADRAO = "f8"
 
+# --- classificação do comportamento do peixe (medido, não informado) ---
+# No Stardew você só descobre QUAL peixe é se conseguir pegar — nas derrotas o
+# nome nunca aparece. Então o bot não pergunta: ele mede o peixe enquanto joga.
+# Limiares em px/s de velocidade média do peixe (|v|), calibráveis com os dados
+# que o próprio bot grava em cada minigame.
+VEL_PEIXE_CALMO = 60      # abaixo disso: praticamente parado / suave
+VEL_PEIXE_AGITADO = 150   # acima disso: arisco (tipo "dart")
+
 PASTA = Path(__file__).parent
 ARQ_STATS = PASTA / "estatisticas.json"
 ARQ_LOG = PASTA / "debug.log"
@@ -130,6 +138,21 @@ CORES_FASE = {
     F_FISGADO: COR_ATIVA,
     F_GUARDANDO: COR_ESPERA,
 }
+
+
+def classificar_peixe(vel_media, viradas_por_s):
+    """Como o peixe se comportou, medido pelo próprio bot.
+
+    Serve no lugar do nome: o jogo só revela o peixe se você o pegar, então
+    rotular à mão é impossível justamente nas derrotas. A assinatura de
+    movimento (o quanto ele corre e o quanto muda de direção) é o que de fato
+    importa pro controle — e o bot vê isso enquanto joga.
+    """
+    if vel_media >= VEL_PEIXE_AGITADO or viradas_por_s >= 1.6:
+        return "arisco"      # tipo dart: arranca e vira direção o tempo todo
+    if vel_media <= VEL_PEIXE_CALMO:
+        return "calmo"       # tipo smooth: previsível
+    return "médio"
 
 
 def cor_do_status(txt):
@@ -415,9 +438,9 @@ class App(ctk.CTk):
 
         linha = ctk.CTkFrame(baixo, fg_color="transparent")
         linha.pack(fill="x", padx=14, pady=(12, 6))
-        ctk.CTkLabel(linha, text="Peixe atual", font=ctk.CTkFont(size=11),
+        ctk.CTkLabel(linha, text="Peixe (opcional)", font=ctk.CTkFont(size=11),
                      text_color=COR_FRACA).pack(side="left", padx=(0, 8))
-        self.ent_peixe = ctk.CTkEntry(linha, placeholder_text="ex.: Peixe-gato", width=150,
+        self.ent_peixe = ctk.CTkEntry(linha, placeholder_text="só se souber", width=130,
                                       height=30, corner_radius=8, border_color=COR_BORDA)
         self.ent_peixe.pack(side="left", padx=(0, 14))
         self.btn_peguei = ctk.CTkButton(linha, text="✔   Peguei", width=95, height=30,
@@ -604,14 +627,11 @@ class App(ctk.CTk):
         if p is None:
             self.lbl_status.configure(text="(nenhum minigame p/ marcar)")
             return
-        peixe = self.ent_peixe.get().strip() or "?"
-        self.log.append({
-            "peixe": peixe,
-            "sucesso": bool(sucesso),
-            "duracao": round(p["duracao"], 1),
-            "controle": round(p["controle"], 3),
-            "quando": datetime.now().isoformat(timespec="seconds"),
-        })
+        p = dict(p)
+        p["sucesso"] = bool(sucesso)
+        # o nome só é conhecido quando você PEGA o peixe — se escapou, fica "?"
+        p["peixe"] = (self.ent_peixe.get().strip() or "?") if sucesso else "?"
+        self.log.append(p)
         self._salvar_log()
         self.tabela_suja = True
 
@@ -623,10 +643,17 @@ class App(ctk.CTk):
         self.tabela_suja = True
 
     def _resumo_por_peixe(self):
-        """Agrupa o log por peixe e devolve linhas prontas + total."""
+        """Agrupa o log pelo COMPORTAMENTO medido do peixe.
+
+        Antes agrupava pelo nome digitado, o que era inútil na prática: o
+        Stardew só revela o peixe se você conseguir pegá-lo, então as derrotas
+        — os casos que a gente mais quer estudar — ficavam todas como "?".
+        O comportamento é medido pelo bot e existe sempre.
+        """
         grupos = {}
         for r in self.log:
-            grupos.setdefault(r["peixe"], []).append(r)
+            chave = r.get("comportamento") or r.get("peixe", "?")
+            grupos.setdefault(chave, []).append(r)
 
         linhas = []
         tot_n = tot_ok = tot_marcados = 0
@@ -669,7 +696,7 @@ class App(ctk.CTk):
                      "   Escreva o nome do peixe acima, deixe o bot jogar,\n"
                      "   e marque ✔ Peguei ou ✖ Escapou no fim de cada um.\n")
         else:
-            cab = f"  {'PEIXE':<15}{'TENT':>5}{'SUCESSO':>9}{'TEMPO':>9}{'CONTROLE':>10}\n"
+            cab = f"  {'COMPORTAMENTO':<15}{'JOGOS':>5}{'SUCESSO':>9}{'TEMPO':>9}{'CONTROLE':>10}\n"
             sep = "  " + "─" * 52 + "\n"
             corpo = ""
             for peixe, n, taxa, dur, ctrl in linhas:
@@ -762,21 +789,30 @@ class App(ctk.CTk):
         self.estado = "SEGURANDO" if segurando else "soltando"
         return segurando
 
-    def _registrar_minigame(self, dur, ctrl):
-        """Guarda o minigame que acabou. Ignora se foi curto demais (ruído)."""
+    def _registrar_minigame(self, dur, ctrl, comportamento, vel_media, viradas_s):
+        """Guarda o minigame que acabou. Ignora se foi curto demais (ruído).
+
+        Grava o comportamento MEDIDO do peixe, não o nome digitado: o jogo só
+        revela o nome se você pegar o peixe, então nas derrotas ele nunca chega.
+        """
         if dur < self.duracao_minima:
             return
         self.capturas += 1
         with self.stats_lock:
-            if self.pendente is not None:  # não marcado: fica como "?"
-                self.log.append({
-                    "peixe": self.ent_peixe.get().strip() or "?",
-                    "sucesso": None,
-                    "duracao": round(self.pendente["duracao"], 1),
-                    "controle": round(self.pendente["controle"], 3),
-                    "quando": datetime.now().isoformat(timespec="seconds"),
-                })
-            self.pendente = {"duracao": dur, "controle": ctrl}
+            if self.pendente is not None:  # não marcado: fica sem resultado
+                p = dict(self.pendente)
+                p["sucesso"] = None
+                self.log.append(p)
+            self.pendente = {
+                "peixe": self.ent_peixe.get().strip() or "?",
+                "comportamento": comportamento,
+                "vel_peixe": round(vel_media),
+                "viradas_s": round(viradas_s, 2),
+                "duracao": round(dur, 1),
+                "controle": round(ctrl, 3),
+                "antecipacao": round(self.antecipacao, 2),
+                "quando": datetime.now().isoformat(timespec="seconds"),
+            }
         self._salvar_log()
         self.tabela_suja = True
 
@@ -899,7 +935,23 @@ class App(ctk.CTk):
                             mg_inicio = agora
                             mg_frames = mg_dentro = 0
                             barra_ant, t_ant, vel = None, agora, 0.0
+                            peixe_ant, vel_peixe = None, 0.0
+                            soma_vp, n_vp, viradas, sinal_ant = 0.0, 0, 0, 0
                             self._dbg("=== MINIGAME ABRIU ===")
+
+                        # mede o PEIXE: é isso que substitui o nome que o jogo
+                        # não conta. |v| médio e viradas de direção = assinatura
+                        if peixe_ant is not None and agora > t_ant:
+                            vp = (peixe_y - peixe_ant) / max(1e-3, agora - t_ant)
+                            vel_peixe = 0.6 * vel_peixe + 0.4 * vp
+                            soma_vp += abs(vp)
+                            n_vp += 1
+                            s = 1 if vp > 20 else (-1 if vp < -20 else 0)
+                            if s and sinal_ant and s != sinal_ant:
+                                viradas += 1
+                            if s:
+                                sinal_ant = s
+                        peixe_ant = peixe_y
 
                         # velocidade da barra (px/s), suavizada p/ tirar ruído.
                         # Limitada porque a barra real não passa de ~450 px/s:
@@ -930,10 +982,14 @@ class App(ctk.CTk):
                             minigame_ativo = False
                             dur = time.time() - mg_inicio
                             ctrl = (mg_dentro / mg_frames) if mg_frames else 0.0
+                            vm = (soma_vp / n_vp) if n_vp else 0.0
+                            vps = viradas / dur if dur > 0 else 0.0
+                            comp = classificar_peixe(vm, vps)
                             self._dbg(f"=== MINIGAME FECHOU === dur={dur:.1f}s "
-                                      f"controle={ctrl*100:.0f}% frames={mg_frames} "
+                                      f"controle={ctrl*100:.0f}% frames={mg_frames} | "
+                                      f"peixe: {comp} (|v|={vm:.0f}px/s, {vps:.1f} viradas/s) "
                                       f"{'(descartado: curto)' if dur < self.duracao_minima else ''}")
-                            self._registrar_minigame(dur, ctrl)
+                            self._registrar_minigame(dur, ctrl, comp, vm, vps)
                             fase, t_fase = (F_GUARDANDO, time.time()) if auto else (None, t_fase)
                         elif not minigame_ativo:
                             if auto:
