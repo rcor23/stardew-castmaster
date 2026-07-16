@@ -32,6 +32,7 @@ import customtkinter as ctk
 from PIL import Image
 
 from deteccao import detectar, detectar_mordida, detectar_barra_forca
+from imgio import imwrite_u
 
 try:
     import winsound
@@ -58,7 +59,9 @@ DUR_CLIQUE = 0.10       # s segurando o botão num clique "normal"
 TEMPO_CARGA = 0.65      # s segurando o clique p/ arremessar (define a distância)
 ESPERA_BOIA = 1.8       # s até a boia cair na água
 TIMEOUT_MORDIDA = 45    # s sem morder -> arremessa de novo
-ESPERA_POS = 2.5        # s depois do minigame (animação do peixe) antes de tentar arremessar
+# 2.5s era curto: o log mostrou ~2 falhas de arremesso depois de CADA peixe,
+# porque a animação de guardar o peixe ainda estava rolando.
+ESPERA_POS = 4.0        # s depois do minigame (animação do peixe) antes de arremessar
 TIMEOUT_FISGADO = 6.0   # s esperando o minigame abrir depois de fisgar
 VEL_MAX = 600.0         # px/s; acima disso e glitch de deteccao (real vai ate ~450)
 
@@ -99,6 +102,7 @@ class App(ctk.CTk):
         # reverter a queda (medido), então ~0.45s à frente evita o overshoot.
         self.antecipacao = 0.45
         self.proc_calib = None  # processo da calibração (evita abrir vários)
+        self.falhas_arremesso = 0
 
         # tolerância a falhas de detecção: só encerra o minigame depois de
         # MISSES_P_ENCERRAR frames seguidos sem ver barra+peixe. Sem isso, um
@@ -400,6 +404,19 @@ class App(ctk.CTk):
         self.txt_tabela.configure(state="disabled")
 
     # ---------- lógica do bot (rodam na thread) ----------
+    def _print_diagnostico(self, sct):
+        """Salva a tela quando o arremesso falha em série.
+
+        É a única forma de descobrir o que está na frente travando o ciclo
+        (popup de peixe novo? recorde? energia acabou?) sem adivinhar.
+        """
+        try:
+            tela = np.array(sct.grab(sct.monitors[1]))[:, :, :3]
+            imwrite_u(PASTA / "falha_arremesso.png", tela)
+            self._dbg("  -> print da tela salvo em falha_arremesso.png")
+        except Exception as e:
+            self._dbg(f"  -> falhou ao salvar print: {e}")
+
     def _clicar(self, dur=DUR_CLIQUE):
         """Clique que o jogo enxerga: segura o botão por alguns ticks.
 
@@ -481,16 +498,29 @@ class App(ctk.CTk):
             # Antes eu clicava no escuro pra "dispensar popup": quando não havia
             # popup, esse clique virava um arremesso curto e emperrava o ciclo.
             pydirectinput.mouseDown()
-            time.sleep(0.25)
-            carregando = detectar_barra_forca(
-                np.array(sct.grab(self.reg_mordida))[:, :, :3])
+            # Fica de olho durante TODO o carregamento, não só num instante: a
+            # barra de força demora a aparecer, e conferir cedo demais fazia o
+            # bot desistir e soltar o botão — o que dava um arremesso fraco e
+            # deixava a linha na água, emperrando as tentativas seguintes.
+            carregando = False
+            t0_carga = time.time()
+            while time.time() - t0_carga < TEMPO_CARGA:
+                if detectar_barra_forca(np.array(sct.grab(self.reg_mordida))[:, :, :3]):
+                    carregando = True
+                    break
+                time.sleep(0.03)
             if not carregando:
                 pydirectinput.mouseUp()
-                self._dbg("arremesso NAO iniciou (barra de força não apareceu) — "
-                          "provável popup; clique serviu p/ dispensar, tentando de novo")
+                self.falhas_arremesso += 1
+                self._dbg(f"arremesso NAO iniciou em {TEMPO_CARGA}s (sem barra de força) — "
+                          f"popup ou linha já na água. falhas seguidas: {self.falhas_arremesso}")
+                if self.falhas_arremesso == 4:   # tira um print p/ diagnóstico
+                    self._print_diagnostico(sct)
                 return F_GUARDANDO, agora   # espera e tenta de novo
-            time.sleep(max(0.0, TEMPO_CARGA - 0.25))
+            # confirmou que está carregando: completa a força e solta
+            time.sleep(max(0.0, TEMPO_CARGA - (time.time() - t0_carga)))
             pydirectinput.mouseUp()         # solta = arremessa
+            self.falhas_arremesso = 0
             self._dbg(f"ARREMESSO confirmado (barra de força vista) "
                       f"cursor={pyautogui.position()}")
             return F_BOIA, time.time()
