@@ -33,6 +33,15 @@ from PIL import Image
 
 from deteccao import detectar, detectar_mordida
 
+try:
+    import winsound
+
+    def bipe(freq, ms):
+        winsound.Beep(freq, ms)
+except Exception:
+    def bipe(freq, ms):
+        pass
+
 # --- fases do ciclo automático ---
 F_ARREMESSAR = "arremessando"
 F_BOIA = "esperando a boia"
@@ -41,6 +50,7 @@ F_FISGADO = "fisgou!"
 F_MINIGAME = "MINIGAME"
 F_GUARDANDO = "guardando o peixe"
 
+ESPERA_INICIO = 5.0     # s após clicar em Iniciar, p/ você voltar o foco ao jogo
 TEMPO_CARGA = 0.65      # s segurando o clique p/ arremessar (define a distância)
 ESPERA_BOIA = 1.8       # s até a boia cair na água
 TIMEOUT_MORDIDA = 45    # s sem morder -> arremessa de novo
@@ -49,6 +59,7 @@ TIMEOUT_FISGADO = 6.0   # s esperando o minigame abrir depois de fisgar
 
 PASTA = Path(__file__).parent
 ARQ_STATS = PASTA / "estatisticas.json"
+ARQ_LOG = PASTA / "debug.log"
 PREVIEW_MAX = (300, 420)  # tamanho máximo da preview (largura, altura)
 
 pyautogui.FAILSAFE = True
@@ -90,6 +101,15 @@ class App(ctk.CTk):
 
         self._montar_ui()
         self._atualizar_ui()
+
+    # ---------- diário de bordo (diagnóstico) ----------
+    def _dbg(self, msg):
+        """Registra em debug.log. É o que permite saber o que o bot fez de fato."""
+        try:
+            with open(ARQ_LOG, "a", encoding="utf-8") as f:
+                f.write(f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}  {msg}\n")
+        except Exception:
+            pass
 
     # ---------- persistência ----------
     def _carregar_log(self):
@@ -344,11 +364,14 @@ class App(ctk.CTk):
 
         if fase == F_GUARDANDO:
             if agora - t_fase >= ESPERA_POS:
+                self._dbg("click p/ dispensar popup do peixe")
                 pydirectinput.click()      # dispensa o popup do peixe pescado
                 time.sleep(0.3)
                 return F_ARREMESSAR, time.time()
 
         elif fase == F_ARREMESSAR:
+            self._dbg(f"ARREMESSO: mouseDown, segura {TEMPO_CARGA}s, mouseUp "
+                      f"(cursor em {pyautogui.position()})")
             pydirectinput.mouseDown()
             time.sleep(TEMPO_CARGA)        # segura = carrega a força
             pydirectinput.mouseUp()        # solta = arremessa
@@ -356,18 +379,22 @@ class App(ctk.CTk):
 
         elif fase == F_BOIA:
             if agora - t_fase >= ESPERA_BOIA:
+                self._dbg("boia caiu -> vigiando o '!'")
                 return F_MORDIDA, agora
 
         elif fase == F_MORDIDA:
             fm = np.array(sct.grab(self.reg_mordida))[:, :, :3]
             if detectar_mordida(fm):
+                self._dbg("'!' DETECTADO -> click p/ fisgar")
                 pydirectinput.click()      # fisga!
                 return F_FISGADO, agora
             if agora - t_fase >= TIMEOUT_MORDIDA:
+                self._dbg(f"timeout: {TIMEOUT_MORDIDA}s sem mordida -> rearremessa")
                 return F_ARREMESSAR, agora  # não mordeu: joga de novo
 
         elif fase == F_FISGADO:
             if agora - t_fase >= TIMEOUT_FISGADO:
+                self._dbg(f"timeout: minigame nao abriu em {TIMEOUT_FISGADO}s -> rearremessa")
                 return F_ARREMESSAR, agora  # minigame não abriu: tenta de novo
 
         return fase, t_fase
@@ -381,6 +408,18 @@ class App(ctk.CTk):
         mg_frames = mg_dentro = 0   # p/ medir "controle %"
         misses = 0                  # frames seguidos sem ver barra+peixe
         fase, t_fase = None, time.time()
+
+        # Dá tempo de você clicar de volta no JOGO. Sem isso o foco e o cursor
+        # ficam na janela do bot, e os cliques dele iriam para ela mesma.
+        auto_inicial = bool(self.sw_auto.get())
+        if auto_inicial:
+            self._dbg(f"--- INICIANDO (auto). Esperando {ESPERA_INICIO}s p/ voce focar o jogo ---")
+            fim_espera = time.time() + ESPERA_INICIO
+            while self.rodando and time.time() < fim_espera:
+                self.estado = f"clique no JOGO! {fim_espera - time.time():.0f}s"
+                time.sleep(0.1)
+            bipe(880, 120)  # começou pra valer
+            self._dbg(f"--- COMECOU. cursor em {pyautogui.position()} ---")
 
         try:
             with mss.mss() as sct:
@@ -397,11 +436,15 @@ class App(ctk.CTk):
                             fase = F_MINIGAME
                             mg_inicio = time.time()
                             mg_frames = mg_dentro = 0
+                            self._dbg("=== MINIGAME ABRIU ===")
                         mg_frames += 1
                         by, bh = barra_rect[1], barra_rect[3]
                         if by <= peixe_y <= by + bh:   # peixe dentro da barra
                             mg_dentro += 1
                         segurando = self._jogar_minigame(barra_y, peixe_y, segurando)
+                        if mg_frames % 15 == 0:  # amostra periódica, não polui o log
+                            self._dbg(f"  minigame: barra_y={barra_y} peixe_y={peixe_y} "
+                                      f"delta={peixe_y-barra_y:+d} {'SEGURA' if segurando else 'solta'}")
                     else:
                         misses += 1
                         if segurando:
@@ -410,8 +453,12 @@ class App(ctk.CTk):
 
                         if minigame_ativo and misses >= self.misses_p_encerrar:
                             minigame_ativo = False
+                            dur = time.time() - mg_inicio
                             ctrl = (mg_dentro / mg_frames) if mg_frames else 0.0
-                            self._registrar_minigame(time.time() - mg_inicio, ctrl)
+                            self._dbg(f"=== MINIGAME FECHOU === dur={dur:.1f}s "
+                                      f"controle={ctrl*100:.0f}% frames={mg_frames} "
+                                      f"{'(descartado: curto)' if dur < self.duracao_minima else ''}")
+                            self._registrar_minigame(dur, ctrl)
                             fase, t_fase = (F_GUARDANDO, time.time()) if auto else (None, t_fase)
                         elif not minigame_ativo:
                             if auto:
