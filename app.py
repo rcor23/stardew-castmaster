@@ -61,6 +61,13 @@ class App(ctk.CTk):
         self.zona_morta = 6
         self.proc_calib = None  # processo da calibração (evita abrir vários)
 
+        # tolerância a falhas de detecção: só encerra o minigame depois de
+        # MISSES_P_ENCERRAR frames seguidos sem ver barra+peixe. Sem isso, um
+        # único frame perdido vira "minigame acabou" e conta um jogo falso.
+        self.misses_p_encerrar = 20
+        # minigame mais curto que isso é ruído, não conta
+        self.duracao_minima = 1.5
+
         # estatísticas
         self.stats_lock = threading.Lock()
         self.pendente = None          # dict {duracao, controle} de um minigame ainda sem resultado
@@ -280,6 +287,7 @@ class App(ctk.CTk):
         frames, t0 = 0, time.time()
         mg_inicio = 0.0
         mg_frames = mg_dentro = 0  # p/ medir "controle %"
+        misses = 0                 # frames seguidos sem ver barra+peixe
         try:
             with mss.mss() as sct:
                 while self.rodando:
@@ -288,6 +296,7 @@ class App(ctk.CTk):
                     ativo = barra_y is not None and peixe_y is not None
 
                     if ativo:
+                        misses = 0
                         if not minigame_ativo:  # começou um minigame
                             minigame_ativo = True
                             mg_inicio = time.time()
@@ -309,11 +318,20 @@ class App(ctk.CTk):
                         else:
                             self.estado = "observando"
                     else:
-                        if minigame_ativo:  # terminou um minigame
+                        misses += 1
+                        # só encerra depois de vários frames seguidos sem ver nada
+                        if minigame_ativo and misses >= self.misses_p_encerrar:
                             minigame_ativo = False
-                            self.capturas += 1
                             dur = time.time() - mg_inicio
                             ctrl = (mg_dentro / mg_frames) if mg_frames else 0.0
+                            if dur < self.duracao_minima:
+                                # curto demais pra ser minigame de verdade: descarta
+                                self.estado = "esperando..."
+                                if segurando:
+                                    pydirectinput.mouseUp()
+                                    segurando = False
+                                continue
+                            self.capturas += 1
                             with self.stats_lock:
                                 # se havia um pendente não marcado, finaliza como "?"
                                 if self.pendente is not None:

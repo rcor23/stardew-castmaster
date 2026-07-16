@@ -35,7 +35,7 @@ except Exception:  # não-Windows: ignora
 
 PASTA = Path(__file__).parent
 SAIDA = PASTA / "amostras"
-DURACAO = 25   # segundos gravando
+DURACAO = 60   # segundos gravando (ciclo completo: arremesso -> mordida -> minigame)
 FPS = 5        # frames por segundo (tela inteira pesa mais)
 
 
@@ -57,8 +57,11 @@ def main():
     print("=" * 60)
     print(" AMOSTRA DO MINIGAME — TELA INTEIRA (diagnóstico)")
     print("=" * 60)
-    print(f" Ao apertar ENTER você terá {DURACAO}s para voltar ao jogo,")
-    print(" jogar a vara e fisgar. Não precisa clicar em nada.")
+    print(f" Ao apertar ENTER você terá {DURACAO}s para gravar um CICLO COMPLETO:")
+    print("   1. Jogue a vara (segure e solte o clique);")
+    print("   2. Espere a mordida (o '!' aparecer);")
+    print("   3. Fisgue e jogue o minigame normalmente;")
+    print("   4. Se der tempo, repita mais uma vez.")
     print()
     print(" AVISOS SONOROS:")
     print("   1 bipe agudo  = começou a gravar (pode pescar)")
