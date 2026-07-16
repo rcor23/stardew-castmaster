@@ -1,0 +1,18 @@
+# Arquivos gerados na máquina do usuário (específicos da tela/sessão)
+config.json
+peixe.png
+estatisticas.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Editores / SO
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
