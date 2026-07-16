@@ -17,6 +17,8 @@ Antes de rodar este, confirme que deteccao.py está detectando bem!
 """
 import json
 import time
+from pathlib import Path
+
 import cv2
 import numpy as np
 import mss
@@ -24,6 +26,9 @@ import pyautogui
 import pydirectinput
 
 from deteccao import detectar
+from imgio import imread_u
+
+PASTA = Path(__file__).parent
 
 pyautogui.FAILSAFE = True  # mouse no canto da tela = aborta
 
@@ -31,9 +36,9 @@ ZONA_MORTA = 6  # pixels de tolerância em volta do centro da barra
 
 
 def main():
-    with open("config.json") as f:
+    with open(PASTA / "config.json") as f:
         região = json.load(f)
-    template = cv2.imread("peixe.png", cv2.IMREAD_GRAYSCALE)
+    template = imread_u(PASTA / "peixe.png", cv2.IMREAD_GRAYSCALE)
     if template is None:
         print("peixe.png não encontrado — rode calibrar.py primeiro.")
         return

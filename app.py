@@ -32,6 +32,7 @@ import customtkinter as ctk
 from PIL import Image
 
 from deteccao import detectar
+from imgio import imread_u
 
 PASTA = Path(__file__).parent
 ARQ_STATS = PASTA / "estatisticas.json"
@@ -194,7 +195,7 @@ class App(ctk.CTk):
         try:
             with open(PASTA / "config.json") as f:
                 self.região = json.load(f)
-            self.template = cv2.imread(str(PASTA / "peixe.png"), cv2.IMREAD_GRAYSCALE)
+            self.template = imread_u(PASTA / "peixe.png", cv2.IMREAD_GRAYSCALE)
             assert self.template is not None
         except Exception:
             self.lbl_status.configure(text="⚠ calibre primeiro!")

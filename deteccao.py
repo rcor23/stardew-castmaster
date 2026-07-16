@@ -18,9 +18,15 @@ Aperte Q na janela para sair.
 """
 import json
 import time
+from pathlib import Path
+
 import cv2
 import numpy as np
 import mss
+
+from imgio import imread_u
+
+PASTA = Path(__file__).parent
 
 # faixa de verde (HSV) da barra do jogador
 VERDE_MIN = np.array([35, 80, 80])
@@ -62,9 +68,9 @@ def detectar(frame, template, limiar=None):
 
 
 def main():
-    with open("config.json") as f:
+    with open(PASTA / "config.json") as f:
         região = json.load(f)
-    template = cv2.imread("peixe.png", cv2.IMREAD_GRAYSCALE)
+    template = imread_u(PASTA / "peixe.png", cv2.IMREAD_GRAYSCALE)
     if template is None:
         print("peixe.png não encontrado — rode calibrar.py primeiro.")
         return

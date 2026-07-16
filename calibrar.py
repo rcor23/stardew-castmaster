@@ -24,9 +24,15 @@ Como usar:
 """
 import json
 import time
+from pathlib import Path
+
 import cv2
 import numpy as np
 import mss
+
+from imgio import imwrite_u
+
+PASTA = Path(__file__).parent
 
 DURACAO = 25       # segundos capturando (tempo pra você fisgar)
 FPS = 2            # prints por segundo
@@ -156,7 +162,9 @@ def main():
             return
 
         peixe = região[fy : fy + fh, fx : fx + fw]
-        cv2.imwrite("peixe.png", peixe)
+        if not imwrite_u(PASTA / "peixe.png", peixe):
+            print(" ERRO: não consegui salvar peixe.png")
+            return
 
         config = {
             "left": monitor["left"] + x,
@@ -164,7 +172,7 @@ def main():
             "width": w,
             "height": h,
         }
-        with open("config.json", "w") as f:
+        with open(PASTA / "config.json", "w") as f:
             json.dump(config, f, indent=2)
 
         print()
