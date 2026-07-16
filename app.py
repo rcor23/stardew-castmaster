@@ -342,11 +342,11 @@ class App(ctk.CTk):
         self.ent_peixe = ctk.CTkEntry(linha, placeholder_text="ex.: Peixe-gato", width=150,
                                       height=30, corner_radius=8, border_color=COR_BORDA)
         self.ent_peixe.pack(side="left", padx=(0, 14))
-        self.btn_peguei = ctk.CTkButton(linha, text="✓  Peguei", width=95, height=30,
+        self.btn_peguei = ctk.CTkButton(linha, text="✔   Peguei", width=95, height=30,
                                         corner_radius=8, fg_color=COR_OK, hover_color="#246324",
                                         command=lambda: self.marcar(True))
         self.btn_peguei.pack(side="left", padx=3)
-        self.btn_escapou = ctk.CTkButton(linha, text="✗  Escapou", width=95, height=30,
+        self.btn_escapou = ctk.CTkButton(linha, text="✖   Escapou", width=95, height=30,
                                          corner_radius=8, fg_color=COR_ERRO, hover_color="#822",
                                          command=lambda: self.marcar(False))
         self.btn_escapou.pack(side="left", padx=3)
@@ -356,13 +356,14 @@ class App(ctk.CTk):
                                         hover_color=COR_CARTAO_ALT, command=self.limpar_stats)
         self.btn_limpar.pack(side="right")
 
-        self.txt_tabela = ctk.CTkTextbox(baixo, font=ctk.CTkFont(family="Consolas", size=12),
-                                         height=150, corner_radius=8, fg_color=COR_CARTAO_ALT,
-                                         border_width=0)
+        self.txt_tabela = ctk.CTkTextbox(baixo, font=ctk.CTkFont(family="Consolas", size=14),
+                                         height=170, corner_radius=8, fg_color=COR_CARTAO_ALT,
+                                         border_width=0, text_color="#e8ecf3",
+                                         activate_scrollbars=False)
         self.txt_tabela.pack(fill="both", expand=True, padx=14, pady=(0, 12))
         self.txt_tabela.configure(state="disabled")
 
-        ctk.CTkLabel(self, text="Marque ✓/✗ ao fim de cada peixe · Failsafe: mouse no canto aborta",
+        ctk.CTkLabel(self, text="Marque ✔/✖ ao fim de cada peixe · Failsafe: mouse no canto aborta",
                      font=ctk.CTkFont(size=11), text_color="gray60").pack(side="bottom", pady=(0, 8))
 
         self.protocol("WM_DELETE_WINDOW", self._fechar)
@@ -473,46 +474,63 @@ class App(ctk.CTk):
             grupos.setdefault(r["peixe"], []).append(r)
 
         linhas = []
-        tot_n = tot_ok = 0
+        tot_n = tot_ok = tot_marcados = 0
         tot_dur = tot_ctrl = 0.0
         for peixe, rs in sorted(grupos.items()):
             n = len(rs)
-            ok = sum(1 for r in rs if r["sucesso"])
+            # A taxa de sucesso só vale sobre os que VOCÊ marcou. Antes eu
+            # dividia pelo total, então minigames não marcados (sucesso=None)
+            # apareciam como fracasso e a tabela mostrava "0%" para peixes que
+            # simplesmente não tinham resultado informado.
+            marcados = [r for r in rs if r["sucesso"] is not None]
+            ok = sum(1 for r in marcados if r["sucesso"])
+            taxa = (ok / len(marcados)) if marcados else None
             dur = sum(r["duracao"] for r in rs) / n
             ctrl = sum(r["controle"] for r in rs) / n
-            linhas.append((peixe, n, ok / n, dur, ctrl))
+            linhas.append((peixe, n, taxa, dur, ctrl))
             tot_n += n
             tot_ok += ok
+            tot_marcados += len(marcados)
             tot_dur += sum(r["duracao"] for r in rs)
             tot_ctrl += sum(r["controle"] for r in rs)
 
         total = None
         if tot_n:
-            total = ("TOTAL", tot_n, tot_ok / tot_n, tot_dur / tot_n, tot_ctrl / tot_n)
+            taxa_tot = (tot_ok / tot_marcados) if tot_marcados else None
+            total = ("TOTAL", tot_n, taxa_tot, tot_dur / tot_n, tot_ctrl / tot_n)
         return linhas, total
 
     def _redesenhar_tabela(self):
         linhas, total = self._resumo_por_peixe()
-        cab = f"  {'PEIXE':<16}{'TENT':>5}{'SUCESSO':>10}{'TEMPO':>8}{'CONTROLE':>11}\n"
-        sep = "  " + "─" * 48 + "\n"
-        corpo = ""
-        for peixe, n, taxa, dur, ctrl in linhas:
-            nome = (peixe[:15]) if len(peixe) > 15 else peixe
-            # medidor de desempenho (a textbox não colore células, então usa forma)
-            marca = "●" if taxa >= 0.8 else ("◐" if taxa >= 0.5 else "○")
-            corpo += (f"  {nome:<16}{n:>5}{taxa*100:>9.0f}%{dur:>7.1f}s"
-                      f"{ctrl*100:>10.0f}%  {marca}\n")
-        if total:
-            _, n, taxa, dur, ctrl = total
-            corpo += sep
-            corpo += (f"  {'TOTAL':<16}{n:>5}{taxa*100:>9.0f}%{dur:>7.1f}s"
-                      f"{ctrl*100:>10.0f}%\n")
-        if not linhas:
-            corpo = "\n   Sem dados ainda.\n   Jogue um minigame e marque ✓ Peguei ou ✗ Escapou.\n"
+
+        def fmt(nome, n, taxa, dur, ctrl, marca=""):
+            # taxa None = nenhum marcado ainda; mostra "—" em vez de fingir 0%
+            txt_taxa = "—" if taxa is None else f"{taxa*100:.0f}%"
+            return (f"  {nome:<15}{n:>5}{txt_taxa:>9}{dur:>8.1f}s"
+                    f"{ctrl*100:>10.0f}%   {marca}\n")
+
+        if not linhas:   # sem cabeçalho vazio pairando sobre nada
+            texto = ("\n   Nenhum peixe registrado ainda.\n\n"
+                     "   Escreva o nome do peixe acima, deixe o bot jogar,\n"
+                     "   e marque ✔ Peguei ou ✖ Escapou no fim de cada um.\n")
+        else:
+            cab = f"  {'PEIXE':<15}{'TENT':>5}{'SUCESSO':>9}{'TEMPO':>9}{'CONTROLE':>10}\n"
+            sep = "  " + "─" * 52 + "\n"
+            corpo = ""
+            for peixe, n, taxa, dur, ctrl in linhas:
+                nome = (peixe[:14]) if len(peixe) > 14 else peixe
+                # medidor pelo CONTROLE (que o bot mede sozinho e sempre existe),
+                # não pela taxa de sucesso, que depende de você marcar
+                marca = "●" if ctrl >= 0.8 else ("◐" if ctrl >= 0.5 else "○")
+                corpo += fmt(nome, n, taxa, dur, ctrl, marca)
+            if total:
+                _, n, taxa, dur, ctrl = total
+                corpo += sep + fmt("TOTAL", n, taxa, dur, ctrl)
+            texto = cab + sep + corpo
 
         self.txt_tabela.configure(state="normal")
         self.txt_tabela.delete("1.0", "end")
-        self.txt_tabela.insert("1.0", cab + sep + corpo)
+        self.txt_tabela.insert("1.0", texto)
         self.txt_tabela.configure(state="disabled")
 
     # ---------- lógica do bot (rodam na thread) ----------
@@ -767,7 +785,7 @@ class App(ctk.CTk):
                                 self.estado = f"{fase} ({int(time.time()-t_fase)}s)" 
                             else:
                                 fase = None
-                                self.estado = "marque ✓/✗" if self.pendente else "esperando..."
+                                self.estado = "marque ✔/✖" if self.pendente else "esperando..."
 
                     # overlay
                     if barra_rect:
