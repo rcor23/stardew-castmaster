@@ -5,3 +5,4 @@ pyautogui
 pydirectinput
 customtkinter
 pillow
+keyboard

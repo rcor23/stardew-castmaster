@@ -30,6 +30,11 @@ Ligue o switch **"Pescar sozinho"** e o bot faz o ciclo completo:
 arremessa → espera a boia → detecta o **"!"** da mordida → fisga → joga o
 minigame → guarda o peixe → repete.
 
+**Atalho (recomendado):** aperte **F8** dentro do próprio jogo para ligar e
+desligar — não precisa alt+tab. Como o cursor e o foco já estão no jogo, ele
+começa na hora (pelo botão da janela ele espera 5s pra você voltar ao jogo).
+Dá pra trocar a tecla no botão "trocar", ao lado do atalho.
+
 **Antes de ligar:**
 - Deixe o **cursor do mouse sobre o jogo**, apontando para onde quer pescar —
   o bot clica na posição atual do cursor, ele não move o mouse;

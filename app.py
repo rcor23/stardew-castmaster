@@ -16,6 +16,7 @@ Tudo em um lugar só:
 Kill switches: botão Parar, fechar a janela, ou mouse no canto da tela.
 """
 import json
+import queue
 import subprocess
 import sys
 import threading
@@ -33,6 +34,11 @@ from PIL import Image
 
 from deteccao import detectar, detectar_mordida, detectar_barra_forca
 from imgio import imwrite_u
+
+try:
+    import keyboard  # hotkey global: liga/desliga sem sair do jogo
+except Exception:
+    keyboard = None
 
 try:
     import winsound
@@ -69,6 +75,7 @@ VEL_MAX = 600.0         # px/s; acima disso e glitch de deteccao (real vai ate ~
 # tem algo travando que o bot não resolve sozinho — o caso clássico é o
 # INVENTÁRIO CHEIO. Aí ele para e avisa em vez de ficar clicando à toa.
 MAX_FALHAS_ARREMESSO = 12   # ~1 minuto de tentativas
+HOTKEY_PADRAO = "f8"
 
 PASTA = Path(__file__).parent
 ARQ_STATS = PASTA / "estatisticas.json"
@@ -152,6 +159,10 @@ class App(ctk.CTk):
         self.proc_calib = None  # processo da calibração (evita abrir vários)
         self.falhas_arremesso = 0
         self.motivo_parada = None   # texto do alarme quando o bot para sozinho
+        self.hotkey_atual = None
+        self.via_hotkey = False
+        # ponte entre a thread do keyboard e a thread do Tk
+        self.fila_hotkey = queue.SimpleQueue()
 
         # tolerância a falhas de detecção: só encerra o minigame depois de
         # MISSES_P_ENCERRAR frames seguidos sem ver barra+peixe. Sem isso, um
@@ -189,6 +200,7 @@ class App(ctk.CTk):
 
     def _aplicar_prefs(self):
         p = self.prefs
+        self._registrar_hotkey(p.get("hotkey", HOTKEY_PADRAO))
         if p.get("auto"):
             self.sw_auto.select()
         if not p.get("mouse", True):
@@ -213,6 +225,7 @@ class App(ctk.CTk):
                     "peixe": self.ent_peixe.get().strip(),
                     "antecipacao": self.antecipacao,
                     "zona_morta": self.zona_morta,
+                    "hotkey": self.prefs.get("hotkey", HOTKEY_PADRAO),
                 }, f, indent=2)
         except Exception:
             pass
@@ -315,7 +328,23 @@ class App(ctk.CTk):
         self.sw_mouse.pack(padx=14, pady=(0, 6), anchor="w")
         self.sw_auto = ctk.CTkSwitch(c1, text="Pescar sozinho (arremessa e fisga)",
                                      font=ctk.CTkFont(size=12))
-        self.sw_auto.pack(padx=14, pady=(0, 12), anchor="w")
+        self.sw_auto.pack(padx=14, pady=(0, 10), anchor="w")
+
+        # atalho global: liga/desliga de dentro do jogo
+        lh = ctk.CTkFrame(c1, fg_color="transparent")
+        lh.pack(fill="x", padx=14, pady=(0, 12))
+        ctk.CTkLabel(lh, text="Atalho (funciona dentro do jogo)",
+                     font=ctk.CTkFont(size=11), text_color=COR_FRACA).pack(side="left")
+        self.btn_hotkey = ctk.CTkButton(lh, text="trocar", width=58, height=24,
+                                        corner_radius=6, fg_color="transparent",
+                                        border_width=1, border_color=COR_BORDA,
+                                        text_color=COR_FRACA, font=ctk.CTkFont(size=11),
+                                        hover_color=COR_CARTAO_ALT, command=self._trocar_hotkey)
+        self.btn_hotkey.pack(side="right")
+        self.lbl_hotkey = ctk.CTkLabel(lh, text=HOTKEY_PADRAO.upper(),
+                                       font=ctk.CTkFont(size=12, weight="bold"),
+                                       text_color=COR_FRACA)
+        self.lbl_hotkey.pack(side="right", padx=(0, 8))
 
         c2 = self._cartao(dir_, "ajuste fino")
         self.sl_zona, self.lbl_zona = self._slider(
@@ -376,6 +405,65 @@ class App(ctk.CTk):
         self.antecipacao = float(v)
         self.lbl_ant.configure(text=f"{self.antecipacao:.2f} s")
 
+    # ---------- hotkey global ----------
+    def _registrar_hotkey(self, tecla):
+        """Liga/desliga o bot de dentro do jogo, sem alt+tab.
+
+        Bônus: quando o start vem daqui, o cursor e o foco já estão no jogo —
+        então não precisa da espera de 5s que existe pro start pelo botão.
+        """
+        if keyboard is None:
+            self.lbl_hotkey.configure(text="(indisponível)", text_color=COR_ERRO)
+            return
+        try:
+            if self.hotkey_atual:
+                keyboard.remove_hotkey(self.hotkey_atual)
+        except Exception:
+            pass
+        try:
+            # O callback roda na thread do keyboard, e o Tkinter NÃO é
+            # thread-safe: mexer nele de fora (mesmo via after()) dá
+            # "main thread is not in main loop". Então a thread só deposita um
+            # pedido na fila, e quem age é o refresh da UI, na thread do Tk.
+            self.hotkey_atual = keyboard.add_hotkey(
+                tecla, lambda: self.fila_hotkey.put(True))
+            self.prefs["hotkey"] = tecla
+            self.lbl_hotkey.configure(text=tecla.upper(), text_color=COR_FRACA)
+            self._dbg(f"hotkey registrada: {tecla}")
+        except Exception as e:
+            self.hotkey_atual = None
+            self.lbl_hotkey.configure(text="tecla inválida", text_color=COR_ERRO)
+            self._dbg(f"falha ao registrar hotkey {tecla!r}: {e}")
+
+    def _toggle_hotkey(self):
+        if self.rodando:
+            self.parar()
+        else:
+            self.iniciar(via_hotkey=True)   # já está no jogo: não espera
+
+    def _trocar_hotkey(self):
+        """Captura a próxima tecla que você apertar e usa como hotkey."""
+        if keyboard is None:
+            return
+        self.btn_hotkey.configure(text="aperte uma tecla…")
+        self.update_idletasks()
+
+        def capturar():
+            try:
+                ev = keyboard.read_event(suppress=False)
+                while ev.event_type != "down":
+                    ev = keyboard.read_event(suppress=False)
+                self.after(0, lambda: self._aplicar_hotkey(ev.name))
+            except Exception:
+                self.after(0, lambda: self.btn_hotkey.configure(text="trocar"))
+
+        threading.Thread(target=capturar, daemon=True).start()
+
+    def _aplicar_hotkey(self, tecla):
+        self.btn_hotkey.configure(text="trocar")
+        self._registrar_hotkey(tecla)
+        self._salvar_prefs()
+
     # ---------- ações ----------
     def abrir_calibracao(self):
         # já tem uma calibração aberta? não abre outra.
@@ -397,7 +485,7 @@ class App(ctk.CTk):
         else:
             self.iniciar()
 
-    def iniciar(self):
+    def iniciar(self, via_hotkey=False):
         # trava contra thread duplicada (dois cliques rápidos criavam 2 bots)
         if self.rodando or (self.thread is not None and self.thread.is_alive()):
             return
@@ -414,6 +502,7 @@ class App(ctk.CTk):
             self.lbl_status.configure(text="⚠ sem região do '!' — auto indisponível")
             self.sw_auto.deselect()
         self.rodando = True
+        self.via_hotkey = via_hotkey
         self.motivo_parada = None
         self.falhas_arremesso = 0
         self.estado = "esperando..."
@@ -436,6 +525,12 @@ class App(ctk.CTk):
 
     def _fechar(self):
         self._salvar_prefs()
+        # solta a hotkey: sem isso o hook global sobrevive ao fechar a janela
+        if keyboard is not None and self.hotkey_atual:
+            try:
+                keyboard.remove_hotkey(self.hotkey_atual)
+            except Exception:
+                pass
         self.rodando = False
         time.sleep(0.1)
         self.destroy()
@@ -712,7 +807,10 @@ class App(ctk.CTk):
         # Dá tempo de você clicar de volta no JOGO. Sem isso o foco e o cursor
         # ficam na janela do bot, e os cliques dele iriam para ela mesma.
         auto_inicial = bool(self.sw_auto.get())
-        if auto_inicial:
+        if auto_inicial and self.via_hotkey:
+            self._dbg(f"--- INICIANDO (auto, via atalho). cursor em {pyautogui.position()} ---")
+            bipe(880, 120)
+        elif auto_inicial:
             self._dbg(f"--- INICIANDO (auto). Esperando {ESPERA_INICIO}s p/ voce focar o jogo ---")
             fim_espera = time.time() + ESPERA_INICIO
             while self.rodando and time.time() < fim_espera:
@@ -813,6 +911,11 @@ class App(ctk.CTk):
         # refresh continue. Sem isso um erro isolado mata a UI inteira — foi o
         # que aconteceu quando parar() lançava e a janela travava.
         try:
+            # atende pedidos da hotkey aqui, onde é seguro mexer no Tk
+            while not self.fila_hotkey.empty():
+                self.fila_hotkey.get_nowait()
+                self._toggle_hotkey()
+
             txt = self.motivo_parada or self.estado
             self.lbl_status.configure(text=txt, fg_color=cor_do_status(txt))
             self.tile_mg.configure(text=str(self.capturas))
