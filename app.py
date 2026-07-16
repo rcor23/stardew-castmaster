@@ -112,7 +112,7 @@ ARQ_LOG = PASTA / "debug.log"
 ARQ_PREFS = PASTA / "preferencias.json"
 # A trilha do minigame é estreita e alta (~53x575), então a caixa acompanha
 # essa proporção — uma caixa larga só renderiza preto dos lados.
-PREVIEW_MAX = (110, 430)  # tamanho máximo da preview (largura, altura)
+PREVIEW_MAX = (100, 340)  # tamanho máximo da preview (largura, altura)
 
 pyautogui.FAILSAFE = True
 
@@ -257,7 +257,7 @@ class App(ctk.CTk):
         self.title("Stardew CastMaster")
         # Medido: o conteúdo pede 519x870. Antes a janela era mais baixa e a
         # tabela de estatísticas ficava cortada.
-        self.geometry("640x960")
+        self.geometry("640x950")
         self.resizable(False, False)
 
         # estado compartilhado com a thread do bot
