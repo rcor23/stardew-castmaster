@@ -67,6 +67,10 @@ pyautogui.FAILSAFE = True
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("green")
 
+# Cor padrão do botão. Precisa ser explícita: configure(fg_color=None) lança
+# ValueError no customtkinter, o que deixava o botão preso em "Parar".
+COR_BOTAO = ctk.ThemeManager.theme["CTkButton"]["fg_color"]
+
 
 class App(ctk.CTk):
     def __init__(self):
@@ -242,8 +246,15 @@ class App(ctk.CTk):
 
     def parar(self):
         self.rodando = False
-        self.btn_iniciar.configure(text="▶  Iniciar", fg_color=None)
         self.estado = "parado"
+        self._dbg("--- PARADO pelo usuário ---")
+        # solta o mouse: se o bot estava segurando o clique, sem isso o botão
+        # fica preso do ponto de vista do Windows
+        try:
+            pydirectinput.mouseUp()
+        except Exception:
+            pass
+        self.btn_iniciar.configure(text="▶  Iniciar", fg_color=COR_BOTAO)
 
     def _fechar(self):
         self.rodando = False
@@ -490,27 +501,33 @@ class App(ctk.CTk):
 
     # ---------- refresh da UI (thread principal) ----------
     def _atualizar_ui(self):
-        self.lbl_status.configure(text=self.estado)
-        self.lbl_stats.configure(text=f"minigames: {self.capturas}   |   {self.fps} fps")
-        if not self.rodando and self.btn_iniciar.cget("text").startswith("⏸"):
-            self.parar()
+        # try/finally: se algo aqui lançar, o after() no finally garante que o
+        # refresh continue. Sem isso um erro isolado mata a UI inteira — foi o
+        # que aconteceu quando parar() lançava e a janela travava.
+        try:
+            self.lbl_status.configure(text=self.estado)
+            self.lbl_stats.configure(text=f"minigames: {self.capturas}   |   {self.fps} fps")
+            if not self.rodando and self.btn_iniciar.cget("text").startswith("⏸"):
+                self.parar()
 
-        if self.tabela_suja:
-            self.tabela_suja = False
-            self._redesenhar_tabela()
+            if self.tabela_suja:
+                self.tabela_suja = False
+                self._redesenhar_tabela()
 
-        with self.frame_lock:
-            frame = None if self.ultimo_frame is None else self.ultimo_frame.copy()
-        if frame is not None:
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w = rgb.shape[:2]
-            escala = min(PREVIEW_MAX[0] / w, PREVIEW_MAX[1] / h)
-            tam = (max(1, int(w * escala)), max(1, int(h * escala)))
-            img = ctk.CTkImage(light_image=Image.fromarray(rgb), size=tam)
-            self.lbl_preview.configure(image=img, text="")
-            self.lbl_preview._image = img  # evita coleta pelo garbage collector
-
-        self.after(66, self._atualizar_ui)  # ~15 fps de preview
+            with self.frame_lock:
+                frame = None if self.ultimo_frame is None else self.ultimo_frame.copy()
+            if frame is not None:
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                h, w = rgb.shape[:2]
+                escala = min(PREVIEW_MAX[0] / w, PREVIEW_MAX[1] / h)
+                tam = (max(1, int(w * escala)), max(1, int(h * escala)))
+                img = ctk.CTkImage(light_image=Image.fromarray(rgb), size=tam)
+                self.lbl_preview.configure(image=img, text="")
+                self.lbl_preview._image = img  # evita coleta pelo garbage collector
+        except Exception as e:
+            self._dbg(f"erro no refresh da UI: {type(e).__name__}: {e}")
+        finally:
+            self.after(66, self._atualizar_ui)  # ~15 fps de preview
 
 
 if __name__ == "__main__":
