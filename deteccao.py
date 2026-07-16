@@ -36,6 +36,14 @@ BARRA_MAX = np.array([70, 255, 255])
 AREA_MIN_BARRA = 300     # px; abaixo disso não é a barra (é alga/ruído)
 LARGURA_MIN_BARRA = 20   # a barra ocupa quase toda a largura da trilha
 
+# O contorno escuro do PEIXE corta a barra verde na diagonal quando ele passa
+# por cima dela, partindo-a em dois contornos. Pegar "o maior" fazia o centro
+# pular até 114px — e justo quando o peixe está DENTRO da barra, que é o estado
+# que a gente quer. Medido em 103 frames reais: 59% das barras vinham partidas.
+# Um fechamento vertical costura os pedaços de volta (partidas: 59% -> 0%, e a
+# altura volta a ser os 164px constantes que a barra realmente tem).
+NUCLEO_COSTURA = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 21))
+
 # --- peixe (ciano) ---
 PEIXE_MIN = np.array([80, 120, 120])
 PEIXE_MAX = np.array([100, 255, 255])
@@ -53,20 +61,38 @@ LARGURA_MAX_MORDIDA = 15     # mais largo que isso é a barra de força (~50px)
 PROPORCAO_MIN_MORDIDA = 2.0  # "!" tem h/w ~4.0; a barra de força ~0.5
 
 
-def detectar_mordida(frame):
-    """True se o "!" da mordida está na tela (e não a barra de força)."""
+def _blobs_amarelos(frame):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, MORDIDA_MIN, MORDIDA_MAX)
     contornos, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    for c in contornos:
-        x, y, w, h = cv2.boundingRect(c)
+    return [(cv2.boundingRect(c), cv2.contourArea(c)) for c in contornos]
+
+
+def detectar_mordida(frame):
+    """True se o "!" da mordida está na tela (e não a barra de força)."""
+    for (x, y, w, h), area in _blobs_amarelos(frame):
         if w == 0 or w > LARGURA_MAX_MORDIDA:
             continue
         if h / w < PROPORCAO_MIN_MORDIDA:
             continue
-        if cv2.contourArea(c) < AREA_MIN_MORDIDA:
+        if area < AREA_MIN_MORDIDA:
             continue
         return True
+    return False
+
+
+def detectar_barra_forca(frame):
+    """True se a BARRA DE FORÇA do arremesso está na tela.
+
+    É o retorno que fecha a malha do arremesso: em vez de clicar no escuro e
+    torcer, o bot confirma que o clique virou mesmo um arremesso. Se a barra
+    não aparece, o clique foi parar noutra coisa (popup de peixe novo/recorde).
+
+    Mesmo amarelo do "!", separada pela forma: ~50x25 px (larga, h/w ~0.5).
+    """
+    for (x, y, w, h), area in _blobs_amarelos(frame):
+        if w > LARGURA_MAX_MORDIDA and h > 0 and h / w < 1.0 and area >= AREA_MIN_MORDIDA * 4:
+            return True
     return False
 
 
@@ -88,7 +114,10 @@ def detectar(frame):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
     barra_y = barra_rect = None
-    r = _maior_blob(cv2.inRange(hsv, BARRA_MIN, BARRA_MAX), AREA_MIN_BARRA)
+    mask_barra = cv2.inRange(hsv, BARRA_MIN, BARRA_MAX)
+    # costura a barra que o peixe cortou (ver NUCLEO_COSTURA)
+    mask_barra = cv2.morphologyEx(mask_barra, cv2.MORPH_CLOSE, NUCLEO_COSTURA)
+    r = _maior_blob(mask_barra, AREA_MIN_BARRA)
     if r is not None and r[2] >= LARGURA_MIN_BARRA:
         x, y, w, h = r
         barra_y = y + h // 2

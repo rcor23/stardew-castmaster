@@ -31,7 +31,7 @@ import pydirectinput
 import customtkinter as ctk
 from PIL import Image
 
-from deteccao import detectar, detectar_mordida
+from deteccao import detectar, detectar_mordida, detectar_barra_forca
 
 try:
     import winsound
@@ -58,13 +58,14 @@ DUR_CLIQUE = 0.10       # s segurando o botão num clique "normal"
 TEMPO_CARGA = 0.65      # s segurando o clique p/ arremessar (define a distância)
 ESPERA_BOIA = 1.8       # s até a boia cair na água
 TIMEOUT_MORDIDA = 45    # s sem morder -> arremessa de novo
-ESPERA_POS = 3.0        # s depois do minigame antes do próximo arremesso
+ESPERA_POS = 2.5        # s depois do minigame (animação do peixe) antes de tentar arremessar
 TIMEOUT_FISGADO = 6.0   # s esperando o minigame abrir depois de fisgar
 VEL_MAX = 600.0         # px/s; acima disso e glitch de deteccao (real vai ate ~450)
 
 PASTA = Path(__file__).parent
 ARQ_STATS = PASTA / "estatisticas.json"
 ARQ_LOG = PASTA / "debug.log"
+ARQ_PREFS = PASTA / "preferencias.json"
 PREVIEW_MAX = (300, 420)  # tamanho máximo da preview (largura, altura)
 
 pyautogui.FAILSAFE = True
@@ -92,6 +93,7 @@ class App(ctk.CTk):
         self.estado = "parado"
         self.fps = 0
         self.capturas = 0
+        self.prefs = self._carregar_prefs()
         self.zona_morta = 6
         # segundos de antecipação do controle preditivo. A barra leva ~1.6s p/
         # reverter a queda (medido), então ~0.45s à frente evita o overshoot.
@@ -112,6 +114,7 @@ class App(ctk.CTk):
         self.tabela_suja = True       # sinaliza que a tabela precisa ser redesenhada
 
         self._montar_ui()
+        self._aplicar_prefs()
         self._atualizar_ui()
 
     # ---------- diário de bordo (diagnóstico) ----------
@@ -120,6 +123,44 @@ class App(ctk.CTk):
         try:
             with open(ARQ_LOG, "a", encoding="utf-8") as f:
                 f.write(f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]}  {msg}\n")
+        except Exception:
+            pass
+
+    # ---------- preferências (lembra os switches entre sessões) ----------
+    def _carregar_prefs(self):
+        try:
+            with open(ARQ_PREFS, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def _aplicar_prefs(self):
+        p = self.prefs
+        if p.get("auto"):
+            self.sw_auto.select()
+        if not p.get("mouse", True):
+            self.sw_mouse.deselect()
+        if "peixe" in p:
+            self.ent_peixe.insert(0, p["peixe"])
+        if "antecipacao" in p:
+            self.antecipacao = float(p["antecipacao"])
+            self.sl_ant.set(self.antecipacao)
+            self.lbl_ant.configure(text=f"{self.antecipacao:.2f}")
+        if "zona_morta" in p:
+            self.zona_morta = int(p["zona_morta"])
+            self.sl_zona.set(self.zona_morta)
+            self.lbl_zona.configure(text=f"{self.zona_morta}")
+
+    def _salvar_prefs(self):
+        try:
+            with open(ARQ_PREFS, "w", encoding="utf-8") as f:
+                json.dump({
+                    "auto": bool(self.sw_auto.get()),
+                    "mouse": bool(self.sw_mouse.get()),
+                    "peixe": self.ent_peixe.get().strip(),
+                    "antecipacao": self.antecipacao,
+                    "zona_morta": self.zona_morta,
+                }, f, indent=2)
         except Exception:
             pass
 
@@ -281,6 +322,7 @@ class App(ctk.CTk):
         self.btn_iniciar.configure(text="▶  Iniciar", fg_color=COR_BOTAO)
 
     def _fechar(self):
+        self._salvar_prefs()
         self.rodando = False
         time.sleep(0.1)
         self.destroy()
@@ -429,17 +471,28 @@ class App(ctk.CTk):
 
         if fase == F_GUARDANDO:
             if agora - t_fase >= ESPERA_POS:
-                self._dbg("clique p/ dispensar popup do peixe")
-                self._clicar()             # dispensa o popup do peixe pescado
-                time.sleep(0.3)
                 return F_ARREMESSAR, time.time()
 
         elif fase == F_ARREMESSAR:
-            self._dbg(f"ARREMESSO: mouseDown, segura {TEMPO_CARGA}s, mouseUp "
-                      f"(cursor em {pyautogui.position()})")
+            # Arremesso em malha fechada. Segura o botão e CONFERE se a barra de
+            # força apareceu. Se não apareceu, o clique foi parar num popup (peixe
+            # novo / recorde de tamanho) em vez de virar arremesso — nesse caso o
+            # próprio clique já dispensou o popup e a gente tenta de novo.
+            # Antes eu clicava no escuro pra "dispensar popup": quando não havia
+            # popup, esse clique virava um arremesso curto e emperrava o ciclo.
             pydirectinput.mouseDown()
-            time.sleep(TEMPO_CARGA)        # segura = carrega a força
-            pydirectinput.mouseUp()        # solta = arremessa
+            time.sleep(0.25)
+            carregando = detectar_barra_forca(
+                np.array(sct.grab(self.reg_mordida))[:, :, :3])
+            if not carregando:
+                pydirectinput.mouseUp()
+                self._dbg("arremesso NAO iniciou (barra de força não apareceu) — "
+                          "provável popup; clique serviu p/ dispensar, tentando de novo")
+                return F_GUARDANDO, agora   # espera e tenta de novo
+            time.sleep(max(0.0, TEMPO_CARGA - 0.25))
+            pydirectinput.mouseUp()         # solta = arremessa
+            self._dbg(f"ARREMESSO confirmado (barra de força vista) "
+                      f"cursor={pyautogui.position()}")
             return F_BOIA, time.time()
 
         elif fase == F_BOIA:
