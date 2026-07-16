@@ -1,95 +1,169 @@
 # Stardew CastMaster 🎣
 
-Bot de pesca externo para Stardew Valley — lê a tela com OpenCV e controla o mouse por fora do jogo.
+An external fishing bot for Stardew Valley. It reads the screen with OpenCV and
+drives the mouse from outside the game — no mods, no SMAPI, nothing injected
+into the game.
 
-## Instalação
+*[Leia em português »](README.pt-BR.md)*
 
-```
+It runs the whole fishing loop on its own: **cast → wait for the bobber →
+spot the `!` bite → hook → play the minigame → stow the fish → repeat.**
+
+Measured on a real session: **92% average control** (the fish stayed inside the
+green bar the whole time in 13 of 15 minigames), **94% hook rate**, and 17
+successful casts against 1 failure.
+
+---
+
+## Install
+
+```bash
 pip install -r requirements.txt
-```
-
-## Configuração do jogo (importante!)
-
-- Jogo em **modo janela** (não fullscreen exclusivo);
-- **Zoom 100%** e **escala de UI 100%** nas opções;
-- Não mova nem redimensione a janela depois de calibrar (senão recalibre).
-
-## Interface gráfica (jeito recomendado)
-
-```
 python app.py
 ```
 
-Janela com botão **Calibrar**, **Iniciar/Parar**, preview ao vivo da visão do bot,
-switch "Controlar o mouse" (desligado = só observa, ótimo pra testar a detecção),
-sliders de ajuste fino e contador de minigames.
+Requires Python 3.9+ on Windows (the beeps and the global hotkey are
+Windows-specific; everything else is portable).
 
-### Pescar sozinho (modo automático)
+## Game setup — this part matters
 
-Ligue o switch **"Pescar sozinho"** e o bot faz o ciclo completo:
-arremessa → espera a boia → detecta o **"!"** da mordida → fisga → joga o
-minigame → guarda o peixe → repete.
+- Run the game in **windowed mode** (not exclusive fullscreen);
+- **Zoom 100%** and **UI scale 100%**;
+- Don't move or resize the window after calibrating.
 
-**Atalho (recomendado):** aperte **F8** dentro do próprio jogo para ligar e
-desligar — não precisa alt+tab. Como o cursor e o foco já estão no jogo, ele
-começa na hora (pelo botão da janela ele espera 5s pra você voltar ao jogo).
-Dá pra trocar a tecla no botão "trocar", ao lado do atalho.
+## Quick start
 
-**Antes de ligar:**
-- Deixe o **cursor do mouse sobre o jogo**, apontando para onde quer pescar —
-  o bot clica na posição atual do cursor, ele não move o mouse;
-- **Não mexa no mouse nem no personagem** depois de ligar: a região do `"!"`
-  é fixa (fica logo acima da cabeça do personagem) e a trilha do minigame
-  aparece perto da boia;
-- Fique de olho na **energia**: pescar gasta stamina e o bot não sabe disso.
+1. **Open the game** and stand next to the water where you want to fish;
+2. Run `python app.py`;
+3. Click **🎯 Calibrate** — a terminal opens and explains the rest:
+   press ENTER, alt+tab back to the game, hook a fish, and it silently takes
+   ~50 screenshots (a beep tells you when it starts and stops). Then pick the
+   screenshot where the minigame is visible and drag a box around the **whole
+   fishing track** — top to bottom, it's taller than it looks;
+4. Turn on **Fish by itself**, put the mouse cursor over the game aimed at your
+   fishing spot, and press **F8**.
 
-**Popups e travamentos:** popups que pedem clique (baú/tesouro, peixe novo,
-recorde de tamanho) o bot dispensa sozinho e continua. Mas se o arremesso
-falhar 12 vezes seguidas, ele assume que travou — o caso clássico é o
-**inventário cheio** — e então **para, toca um alarme** (6 bipes agudos) e
-salva um print da tela em `falha_arremesso.png` mostrando o que travou.
+That's it. Press **F8** again to stop.
 
-### Registro estatístico
+## Fishing by itself
 
-Na parte de baixo da janela há uma tabela de desempenho **por peixe**:
+| Switch | What it does |
+|---|---|
+| **Control the mouse** | Off = the bot only *watches* and draws what it sees. Great for checking the detection before letting it play. |
+| **Fish by itself** | The full loop: cast, hook, play, repeat. Off = you cast and hook, the bot only plays the minigame. |
 
-1. Digite o nome do peixe que está testando no campo **"Peixe atual"** (ex.: `Peixe-gato`);
-2. Deixe o bot jogar o minigame;
-3. Ao terminar, o status mostra **"marque ✓/✗"** — clique **✓ Peguei** ou **✗ Escapou**.
+**Use the F8 hotkey**, not the Start button. The bot clicks wherever the cursor
+already is — it never moves the mouse. Pressing F8 from inside the game means
+the cursor and focus are already in the right place, so it starts immediately.
+(Starting from the button leaves focus on the bot window, so it waits 5 seconds
+for you to click back into the game.) You can rebind the key with **change**.
 
-A tabela acumula, por peixe: nº de tentativas, **taxa de sucesso**, **tempo médio** e
-**controle %** (quanto do tempo o peixe ficou dentro da barra — medido automaticamente
-pelo bot). Assim você vê em quais tipos de peixe o bot vai bem e em quais precisa ajustar
-a zona morta / limiar. Tudo é salvo em `estatisticas.json` e persiste entre sessões.
-O botão **🗑 Limpar** zera o registro.
+**While it runs:** don't touch the mouse and don't walk the character. The `!`
+region is pinned above your character's head, and the minigame track appears
+near the bobber — moving either one blinds the bot. Also keep an eye on
+**energy**: fishing drains stamina and the bot doesn't know that.
 
-> O bot mede sozinho a duração e o controle; o resultado (peguei/escapou) é você quem
-> marca, porque detectar isso na tela exigiria calibrar a barrinha de progresso — fica pra v2.
+**Popups and jams:** popups that need a click (treasure chest, new fish, record
+size) get dismissed automatically and it carries on. But if a cast fails 12
+times in a row, something it can't solve is in the way — usually a **full
+inventory** — so it **stops, sounds an alarm** (6 sharp beeps), and saves a
+screenshot to `falha_arremesso.png` so you can see what blocked it.
 
-## Passo a passo (scripts avulsos, alternativa à interface)
+**Kill switches:** F8, the Stop button, closing the window, or throwing the
+**mouse into a screen corner** (pyautogui failsafe).
 
-| Etapa | Comando | O que faz | Como saber que passou |
-|---|---|---|---|
-| 1. Calibrar | `python calibrar.py` | Marca a região da barra e recorta o ícone do peixe | Gera `config.json` e `peixe.png` |
-| 2. Detectar | `python deteccao.py` | Só observa — desenha retângulos no que ele vê | Pescando manualmente, os retângulos seguem a barra (verde) e o peixe (vermelho) sem falhar |
-| 3. Bot | `python bot.py` | Joga o minigame sozinho (você joga a vara e fisga) | Ele vence o minigame consistentemente |
+## Per-fish stats
 
-## Kill switches (parar o bot)
+Type the fish name in **Peixe atual**, let the bot play, then click **✔ Peguei**
+(caught) or **✖ Escapou** (escaped) when the status asks. The table tracks, per
+fish: attempts, success rate, average duration, and **control %** — the share of
+the minigame the fish spent inside the green bar.
 
-- Aperte **Q** na janela de debug;
-- Jogue o **mouse num canto da tela** (failsafe do pyautogui).
+The bot measures duration and control on its own; the outcome is yours to mark,
+because reading it off the screen would mean calibrating the progress meter too.
+Success rate is computed **only over the ones you marked** — unmarked runs show
+`—`, not `0%`. Saved to `estatisticas.json` and kept between sessions.
 
-## Dicas de teste
+## How it works
 
-- Comece com a **Vara de Treino** (Willy vende) — os peixes são lentos e fáceis;
-- Teste no lago da fazenda ou no oceano da praia;
-- Anote a taxa de sucesso: peixes capturados ÷ minigames jogados;
-- Depois teste com peixes difíceis (rio na chuva, mineração) e ajuste `ZONA_MORTA` em `bot.py`;
-- Se o peixe "sumir" da detecção, diminua `LIMIAR_PEIXE` em `deteccao.py` (ex.: 0.45).
+Everything below was derived from measuring real captured frames, not guessed.
 
-## Próximos passos (v2)
+**Finding things by colour.** The bar and the fish sit in well-separated hue
+bands, so plain HSV thresholds beat template matching (which failed exactly when
+the fish left the bar — the crop had the bar's green baked into its background):
 
-- Arremesso e fisgada automáticos (detectar o balão de "!" na tela);
-- Loop completo: pescar -> capturar -> arremessar de novo;
-- Pegar o baú de tesouro quando aparecer (segunda barra no minigame);
-- Trocar o controle liga/desliga por um controle PID (movimento mais suave).
+| | hue | note |
+|---|---|---|
+| player's bar | 40–70 | yellow-green, saturated |
+| fish | 80–100 | cyan |
+| track water | 110–125 | blue |
+
+**Stitching the bar back together.** The fish's dark outline cuts diagonally
+across the green bar, splitting it into two contours. Taking "the largest" made
+the bar's centre jump by up to 114px — precisely when the fish was *inside* the
+bar, the state we're aiming for. The bar's height gives it away: it's a constant
+164px, but detection was reading a median of 113px, and **59% of frames came
+back split**. A vertical morphological close fixes it (59% → 0%). This one
+change took average control from 16% to 85%.
+
+**Predictive control, not bang-bang.** The bar carries heavy inertia — measured
+from the logs, it took 1.6s to stop falling even while held. Reacting only once
+the fish crosses the bar is always too late: the bar sails past and then plunges.
+So the bot aims at where the bar *will be*:
+
+```
+predicted = bar_y + velocity × lookahead     # lookahead ≈ 0.45s
+```
+
+**Telling the `!` from the cast meter.** Both are yellow and both appear above
+the character's head. They separate by shape — the `!` is 5×20 px (h/w ≈ 4.0),
+the cast power meter is ~50×25 (h/w ≈ 0.5). Validated across 296 frames: 6/6
+real bites, zero false positives.
+
+**Clicks have to be held.** Stardew samples the mouse button once per tick
+(~16ms). `pydirectinput.click()` presses and releases in under 1ms and falls
+*between* ticks — the game never sees it. Every click holds for 100ms (~6 ticks).
+This was found by accident in a log: hooks kept failing, but the *cast* (which
+holds the button 0.65s) hooked a fish by mistake.
+
+**Closed-loop casting.** The bot holds the button and confirms the cast power
+meter actually appeared before believing it cast. Blind-clicking to "dismiss a
+popup" used to fire a weak cast when no popup was there, which jammed the cycle.
+
+## Files
+
+| File | Role |
+|---|---|
+| `app.py` | The GUI and the bot loop |
+| `deteccao.py` | Finds the bar, the fish, the `!`, and the cast meter |
+| `calibrar.py` | Locates the fishing track on *your* screen → `config.json` |
+| `amostra.py` | Diagnostic: records full-screen frames while you fish |
+| `imgio.py` | Unicode-safe image I/O (see below) |
+| `bot.py` | Headless version, minigame only |
+
+## Gotchas worth knowing
+
+**OpenCV silently fails on non-ASCII paths.** On Windows, `cv2.imread` /
+`cv2.imwrite` use ANSI paths, so any accented character in the path makes them
+return `None` / `False` **without raising**. This project lives under
+`Área de Trabalho`, which broke template loading and made the app claim it wasn't
+calibrated when it was. `imgio.py` routes I/O through numpy instead.
+
+**Tkinter is not thread-safe.** The hotkey callback runs on the keyboard
+library's thread; calling `after()` from there raises *"main thread is not in
+main loop"*. That thread only drops a request on a queue — the UI refresh acts on
+it from the Tk thread.
+
+**The track region is fixed.** Stardew draws the minigame near the bobber, so
+casting from a different spot or with a very different power puts the track
+somewhere else and the bot goes blind. Cast from the same place. Auto-locating
+the track each time is the natural next step.
+
+## Roadmap
+
+- Auto-locate the minigame track instead of relying on a fixed region;
+- Read the catch progress meter, so the bot knows whether it won without you
+  marking it;
+- Grab the treasure chest when it shows up (the second bar in the minigame);
+- Detect the full-inventory dialog specifically, rather than inferring a jam
+  from repeated cast failures.
