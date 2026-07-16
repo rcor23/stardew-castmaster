@@ -81,10 +81,17 @@ HOTKEY_PADRAO = "f8"
 # --- classificação do comportamento do peixe (medido, não informado) ---
 # No Stardew você só descobre QUAL peixe é se conseguir pegar — nas derrotas o
 # nome nunca aparece. Então o bot não pergunta: ele mede o peixe enquanto joga.
-# Limiares em px/s de velocidade média do peixe (|v|), calibráveis com os dados
-# que o próprio bot grava em cada minigame.
-VEL_PEIXE_CALMO = 60      # abaixo disso: praticamente parado / suave
-VEL_PEIXE_AGITADO = 150   # acima disso: arisco (tipo "dart")
+#
+# Limiares calibrados com dados reais: 13 minigames vencidos mediram |v| entre
+# 46 e 77 px/s. A 1ª versão usava média de |v| e contava "viradas" acima de
+# 20px/s — e classificou TODOS como arisco, porque:
+#   - a média é envenenada por um único frame com glitch de detecção;
+#   - a 40fps, 1 pixel de tremor já vira 40px/s e contava como virada.
+# Agora usa MEDIANA (imune a outlier) e só conta virada de verdade.
+VEL_PEIXE_CALMO = 90       # abaixo disso: previsível (o comum mede ~50)
+VEL_PEIXE_AGITADO = 220    # acima disso: arisco de verdade
+VIRADA_MIN = 120.0         # px/s p/ contar como mudança de direção (acima do ruído)
+VEL_PEIXE_MAX = 700.0      # acima disso é glitch de detecção, não peixe
 
 PASTA = Path(__file__).parent
 ARQ_STATS = PASTA / "estatisticas.json"
@@ -140,17 +147,63 @@ CORES_FASE = {
 }
 
 
-def classificar_peixe(vel_media, viradas_por_s):
+def medir_peixe(trajetoria):
+    """Assinatura de movimento do peixe a partir da trajetória [(t, y), ...].
+
+    Usa MEDIANA de |v|, não média: um único frame com glitch de detecção (o
+    peixe some e reaparece noutro ponto) joga a média pra 692 px/s num peixe
+    que na verdade fazia 120. A mediana ignora esses outliers.
+    """
+    if len(trajetoria) < 5:
+        return 0.0, 0.0
+
+    # 1) filtro de mediana em janela 3: mata glitch de 1 frame E o tremor de
+    #    ±1-2px da detecção, que a 40fps já vale 80-160 px/s de "velocidade"
+    ts = [p[0] for p in trajetoria]
+    ys = [p[1] for p in trajetoria]
+    suave = [ys[0]]
+    for i in range(1, len(ys) - 1):
+        suave.append(sorted(ys[i - 1:i + 2])[1])
+    suave.append(ys[-1])
+
+    # 2) velocidades sobre o sinal já limpo
+    vs = []
+    for i in range(len(suave) - 1):
+        dt = ts[i + 1] - ts[i]
+        if dt <= 0:
+            continue
+        v = (suave[i + 1] - suave[i]) / dt
+        if abs(v) <= VEL_PEIXE_MAX:   # ainda descarta glitch, não peixe
+            vs.append(v)
+    if not vs:
+        return 0.0, 0.0
+    trajetoria = list(zip(ts, suave))
+
+    vel = float(np.median([abs(v) for v in vs]))
+
+    # viradas: só conta acima de VIRADA_MIN, senão conta tremor de 1 pixel
+    viradas, sinal = 0, 0
+    for v in vs:
+        if abs(v) < VIRADA_MIN:
+            continue
+        s = 1 if v > 0 else -1
+        if sinal and s != sinal:
+            viradas += 1
+        sinal = s
+    dur = trajetoria[-1][0] - trajetoria[0][0]
+    return vel, (viradas / dur if dur > 0 else 0.0)
+
+
+def classificar_peixe(vel_mediana, viradas_por_s):
     """Como o peixe se comportou, medido pelo próprio bot.
 
     Serve no lugar do nome: o jogo só revela o peixe se você o pegar, então
     rotular à mão é impossível justamente nas derrotas. A assinatura de
-    movimento (o quanto ele corre e o quanto muda de direção) é o que de fato
-    importa pro controle — e o bot vê isso enquanto joga.
+    movimento é o que de fato importa pro controle — e o bot vê isso jogando.
     """
-    if vel_media >= VEL_PEIXE_AGITADO or viradas_por_s >= 1.6:
+    if vel_mediana >= VEL_PEIXE_AGITADO or viradas_por_s >= 1.2:
         return "arisco"      # tipo dart: arranca e vira direção o tempo todo
-    if vel_media <= VEL_PEIXE_CALMO:
+    if vel_mediana <= VEL_PEIXE_CALMO:
         return "calmo"       # tipo smooth: previsível
     return "médio"
 
@@ -935,23 +988,12 @@ class App(ctk.CTk):
                             mg_inicio = agora
                             mg_frames = mg_dentro = 0
                             barra_ant, t_ant, vel = None, agora, 0.0
-                            peixe_ant, vel_peixe = None, 0.0
-                            soma_vp, n_vp, viradas, sinal_ant = 0.0, 0, 0, 0
+                            traj_peixe = []
                             self._dbg("=== MINIGAME ABRIU ===")
 
-                        # mede o PEIXE: é isso que substitui o nome que o jogo
-                        # não conta. |v| médio e viradas de direção = assinatura
-                        if peixe_ant is not None and agora > t_ant:
-                            vp = (peixe_y - peixe_ant) / max(1e-3, agora - t_ant)
-                            vel_peixe = 0.6 * vel_peixe + 0.4 * vp
-                            soma_vp += abs(vp)
-                            n_vp += 1
-                            s = 1 if vp > 20 else (-1 if vp < -20 else 0)
-                            if s and sinal_ant and s != sinal_ant:
-                                viradas += 1
-                            if s:
-                                sinal_ant = s
-                        peixe_ant = peixe_y
+                        # guarda a trajetória do peixe e mede no fim: substitui o
+                        # nome que o jogo não conta quando o peixe escapa
+                        traj_peixe.append((agora, peixe_y))
 
                         # velocidade da barra (px/s), suavizada p/ tirar ruído.
                         # Limitada porque a barra real não passa de ~450 px/s:
@@ -982,8 +1024,7 @@ class App(ctk.CTk):
                             minigame_ativo = False
                             dur = time.time() - mg_inicio
                             ctrl = (mg_dentro / mg_frames) if mg_frames else 0.0
-                            vm = (soma_vp / n_vp) if n_vp else 0.0
-                            vps = viradas / dur if dur > 0 else 0.0
+                            vm, vps = medir_peixe(traj_peixe)
                             comp = classificar_peixe(vm, vps)
                             self._dbg(f"=== MINIGAME FECHOU === dur={dur:.1f}s "
                                       f"controle={ctrl*100:.0f}% frames={mg_frames} | "
