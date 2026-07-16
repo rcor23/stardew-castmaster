@@ -93,6 +93,19 @@ VEL_PEIXE_AGITADO = 220    # acima disso: arisco de verdade
 VIRADA_MIN = 120.0         # px/s p/ contar como mudança de direção (acima do ruído)
 VEL_PEIXE_MAX = 700.0      # acima disso é glitch de detecção, não peixe
 
+# --- inferir vitória/derrota pela duração ---
+# A barra de progresso do minigame começa em ~30% e enche a uma taxa fixa
+# enquanto o peixe está dentro da barra verde. Isso deixa uma assinatura no
+# tempo, visível em 26 minigames reais:
+#   - 18 jogos duraram 7.7-7.8s, e TODOS tinham exatamente 100% de controle:
+#     é o tempo de encher de 30% a 100% na taxa máxima. Uma vitória não pode
+#     ser mais rápida que isso.
+#   - 5 jogos duraram ~3.0s, todos com controle 21-44%: é o tempo dos 30%
+#     iniciais escoarem.
+# Então a duração sozinha já entrega o resultado, sem ler a barra laranja.
+DUR_MIN_VITORIA = 7.5      # nenhuma vitória observada abaixo disso
+DUR_MAX_DERROTA = 4.5      # acima disso não dá tempo de escoar sem ganhar terreno
+
 PASTA = Path(__file__).parent
 ARQ_STATS = PASTA / "estatisticas.json"
 ARQ_LOG = PASTA / "debug.log"
@@ -192,6 +205,22 @@ def medir_peixe(trajetoria):
         sinal = s
     dur = trajetoria[-1][0] - trajetoria[0][0]
     return vel, (viradas / dur if dur > 0 else 0.0)
+
+
+def inferir_resultado(dur, controle):
+    """Pegou ou escapou, deduzido da duração. None = incerto.
+
+    Ver DUR_MIN_VITORIA: encher a barra de progresso tem taxa máxima, então
+    uma vitória leva no mínimo ~7.5s; abaixo disso o minigame só pode ter
+    acabado porque o progresso zerou. Não precisa ler a barra laranja nem
+    depender de você marcar — que era impossível nas derrotas, já que o jogo
+    só revela o peixe quando você o pega.
+    """
+    if dur >= DUR_MIN_VITORIA:
+        return True
+    if dur <= DUR_MAX_DERROTA:
+        return False
+    return None    # zona cinzenta: deixa pra marcação manual
 
 
 def classificar_peixe(vel_mediana, viradas_por_s):
@@ -682,6 +711,7 @@ class App(ctk.CTk):
             return
         p = dict(p)
         p["sucesso"] = bool(sucesso)
+        p["inferido"] = False      # você viu; vale mais que a dedução
         # o nome só é conhecido quando você PEGA o peixe — se escapou, fica "?"
         p["peixe"] = (self.ent_peixe.get().strip() or "?") if sucesso else "?"
         self.log.append(p)
@@ -852,10 +882,9 @@ class App(ctk.CTk):
             return
         self.capturas += 1
         with self.stats_lock:
-            if self.pendente is not None:  # não marcado: fica sem resultado
-                p = dict(self.pendente)
-                p["sucesso"] = None
-                self.log.append(p)
+            if self.pendente is not None:
+                # não marcado, mas o resultado inferido pela duração continua
+                self.log.append(dict(self.pendente))
             self.pendente = {
                 "peixe": self.ent_peixe.get().strip() or "?",
                 "comportamento": comportamento,
@@ -864,6 +893,8 @@ class App(ctk.CTk):
                 "duracao": round(dur, 1),
                 "controle": round(ctrl, 3),
                 "antecipacao": round(self.antecipacao, 2),
+                "sucesso": inferir_resultado(dur, ctrl),   # deduzido da duração
+                "inferido": True,                          # ✔/✖ manual sobrescreve
                 "quando": datetime.now().isoformat(timespec="seconds"),
             }
         self._salvar_log()
@@ -1040,7 +1071,12 @@ class App(ctk.CTk):
                                 self.estado = f"{fase} ({int(time.time()-t_fase)}s)" 
                             else:
                                 fase = None
-                                self.estado = "marque ✔/✖" if self.pendente else "esperando..."
+                                if self.pendente:
+                                    r = self.pendente.get("sucesso")
+                                    self.estado = ("PEGOU ✔" if r else
+                                                   "ESCAPOU ✖" if r is False else "marque ✔/✖")
+                                else:
+                                    self.estado = "esperando..."
 
                     # overlay
                     if barra_rect:
