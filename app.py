@@ -88,6 +88,9 @@ class App(ctk.CTk):
         self.fps = 0
         self.capturas = 0
         self.zona_morta = 6
+        # segundos de antecipação do controle preditivo. A barra leva ~1.6s p/
+        # reverter a queda (medido), então ~0.45s à frente evita o overshoot.
+        self.antecipacao = 0.45
         self.proc_calib = None  # processo da calibração (evita abrir vários)
 
         # tolerância a falhas de detecção: só encerra o minigame depois de
@@ -170,6 +173,14 @@ class App(ctk.CTk):
         self.lbl_zona = ctk.CTkLabel(dir_, text=f"{self.zona_morta}")
         self.lbl_zona.pack(padx=16, anchor="e")
 
+        ctk.CTkLabel(dir_, text="Antecipação (s) — evita o efeito sanfona").pack(
+            padx=16, pady=(6, 0), anchor="w")
+        self.sl_ant = ctk.CTkSlider(dir_, from_=0.0, to=1.0, command=self._mudou_ant)
+        self.sl_ant.set(self.antecipacao)
+        self.sl_ant.pack(fill="x", padx=16)
+        self.lbl_ant = ctk.CTkLabel(dir_, text=f"{self.antecipacao:.2f}")
+        self.lbl_ant.pack(padx=16, anchor="e")
+
         self.lbl_stats = ctk.CTkLabel(dir_, text="minigames: 0   |   0 fps")
         self.lbl_stats.pack(pady=(16, 4))
 
@@ -205,6 +216,10 @@ class App(ctk.CTk):
         self.zona_morta = int(v)
         self.lbl_zona.configure(text=f"{self.zona_morta}")
 
+    def _mudou_ant(self, v):
+        self.antecipacao = float(v)
+        self.lbl_ant.configure(text=f"{self.antecipacao:.2f}")
+
     # ---------- ações ----------
     def abrir_calibracao(self):
         # já tem uma calibração aberta? não abre outra.
@@ -227,6 +242,9 @@ class App(ctk.CTk):
             self.iniciar()
 
     def iniciar(self):
+        # trava contra thread duplicada (dois cliques rápidos criavam 2 bots)
+        if self.rodando or (self.thread is not None and self.thread.is_alive()):
+            return
         try:
             with open(PASTA / "config.json") as f:
                 self.região = json.load(f)
@@ -334,16 +352,31 @@ class App(ctk.CTk):
         self.txt_tabela.configure(state="disabled")
 
     # ---------- lógica do bot (rodam na thread) ----------
-    def _jogar_minigame(self, barra_y, peixe_y, segurando):
-        """Segura/solta o clique pra levar a barra verde até o peixe."""
+    def _jogar_minigame(self, barra_y, peixe_y, vel, segurando):
+        """Segura/solta o clique pra levar a barra verde até o peixe.
+
+        Controle PREDITIVO, não liga/desliga. A barra do Stardew tem inércia
+        pesada: medido no debug.log, mesmo segurando ela levou 1.6s para parar
+        de cair. Um controle que só reage quando o peixe cruza a barra chega
+        sempre tarde e faz a barra passar voando (efeito sanfona: controle 7-12%).
+
+        Então miramos onde a barra VAI ESTAR daqui a `antecipacao` segundos:
+
+            prevista = barra_y + velocidade * antecipacao
+
+        e comparamos o peixe com essa posição prevista. Assim ele solta ANTES
+        de chegar, deixando a inércia terminar o trabalho.
+        """
         if not self.sw_mouse.get():
             self.estado = "observando"
             return segurando
-        if peixe_y < barra_y - self.zona_morta and not segurando:
-            pydirectinput.mouseDown()   # peixe acima -> barra sobe
+
+        prevista = barra_y + vel * self.antecipacao
+        if peixe_y < prevista - self.zona_morta and not segurando:
+            pydirectinput.mouseDown()   # vai parar abaixo do peixe -> sobe mais
             segurando = True
-        elif peixe_y > barra_y + self.zona_morta and segurando:
-            pydirectinput.mouseUp()     # peixe abaixo -> barra desce
+        elif peixe_y > prevista + self.zona_morta and segurando:
+            pydirectinput.mouseUp()     # vai parar acima do peixe -> deixa cair
             segurando = False
         self.estado = "SEGURANDO" if segurando else "soltando"
         return segurando
@@ -419,6 +452,7 @@ class App(ctk.CTk):
         mg_frames = mg_dentro = 0   # p/ medir "controle %"
         misses = 0                  # frames seguidos sem ver barra+peixe
         fase, t_fase = None, time.time()
+        barra_ant, t_ant, vel = None, time.time(), 0.0   # p/ estimar a velocidade
 
         # Dá tempo de você clicar de volta no JOGO. Sem isso o foco e o cursor
         # ficam na janela do bot, e os cliques dele iriam para ela mesma.
@@ -429,6 +463,9 @@ class App(ctk.CTk):
             while self.rodando and time.time() < fim_espera:
                 self.estado = f"clique no JOGO! {fim_espera - time.time():.0f}s"
                 time.sleep(0.1)
+            if not self.rodando:      # parou durante a espera: não anuncia início
+                self._dbg("--- cancelado durante a espera ---")
+                return
             bipe(880, 120)  # começou pra valer
             self._dbg(f"--- COMECOU. cursor em {pyautogui.position()} ---")
 
@@ -442,20 +479,31 @@ class App(ctk.CTk):
 
                     if ativo:
                         misses = 0
+                        agora = time.time()
                         if not minigame_ativo:      # começou um minigame
                             minigame_ativo = True
                             fase = F_MINIGAME
-                            mg_inicio = time.time()
+                            mg_inicio = agora
                             mg_frames = mg_dentro = 0
+                            barra_ant, t_ant, vel = None, agora, 0.0
                             self._dbg("=== MINIGAME ABRIU ===")
+
+                        # velocidade da barra (px/s), suavizada p/ tirar ruído
+                        if barra_ant is not None and agora > t_ant:
+                            v_inst = (barra_y - barra_ant) / (agora - t_ant)
+                            vel = 0.6 * vel + 0.4 * v_inst
+                        barra_ant, t_ant = barra_y, agora
+
                         mg_frames += 1
                         by, bh = barra_rect[1], barra_rect[3]
                         if by <= peixe_y <= by + bh:   # peixe dentro da barra
                             mg_dentro += 1
-                        segurando = self._jogar_minigame(barra_y, peixe_y, segurando)
+                        segurando = self._jogar_minigame(barra_y, peixe_y, vel, segurando)
                         if mg_frames % 15 == 0:  # amostra periódica, não polui o log
-                            self._dbg(f"  minigame: barra_y={barra_y} peixe_y={peixe_y} "
-                                      f"delta={peixe_y-barra_y:+d} {'SEGURA' if segurando else 'solta'}")
+                            prev = barra_y + vel * self.antecipacao
+                            self._dbg(f"  minigame: barra={barra_y} peixe={peixe_y} "
+                                      f"vel={vel:+.0f}px/s prevista={prev:.0f} "
+                                      f"{'SEGURA' if segurando else 'solta'}")
                     else:
                         misses += 1
                         if segurando:
