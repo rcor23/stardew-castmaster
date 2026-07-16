@@ -64,6 +64,11 @@ TIMEOUT_MORDIDA = 45    # s sem morder -> arremessa de novo
 ESPERA_POS = 4.0        # s depois do minigame (animação do peixe) antes de arremessar
 TIMEOUT_FISGADO = 6.0   # s esperando o minigame abrir depois de fisgar
 VEL_MAX = 600.0         # px/s; acima disso e glitch de deteccao (real vai ate ~450)
+# Popups que precisam de clique (baú/tesouro, peixe novo, recorde) somem em 1-2
+# retentativas do arremesso. Mas se o arremesso falhar MUITAS vezes seguidas,
+# tem algo travando que o bot não resolve sozinho — o caso clássico é o
+# INVENTÁRIO CHEIO. Aí ele para e avisa em vez de ficar clicando à toa.
+MAX_FALHAS_ARREMESSO = 12   # ~1 minuto de tentativas
 
 PASTA = Path(__file__).parent
 ARQ_STATS = PASTA / "estatisticas.json"
@@ -103,6 +108,7 @@ class App(ctk.CTk):
         self.antecipacao = 0.45
         self.proc_calib = None  # processo da calibração (evita abrir vários)
         self.falhas_arremesso = 0
+        self.motivo_parada = None   # texto do alarme quando o bot para sozinho
 
         # tolerância a falhas de detecção: só encerra o minigame depois de
         # MISSES_P_ENCERRAR frames seguidos sem ver barra+peixe. Sem isso, um
@@ -308,6 +314,8 @@ class App(ctk.CTk):
             self.lbl_status.configure(text="⚠ sem região do '!' — auto indisponível")
             self.sw_auto.deselect()
         self.rodando = True
+        self.motivo_parada = None
+        self.falhas_arremesso = 0
         self.estado = "esperando..."
         self.btn_iniciar.configure(text="⏸  Parar", fg_color="#a33")
         self.thread = threading.Thread(target=self._loop, daemon=True)
@@ -417,6 +425,23 @@ class App(ctk.CTk):
         except Exception as e:
             self._dbg(f"  -> falhou ao salvar print: {e}")
 
+    def _alarmar_travado(self, sct):
+        """Para o bot e chama você: tem algo travando que ele não resolve.
+
+        O suspeito nº1 é o INVENTÁRIO CHEIO — o peixe não entra na mochila e o
+        jogo não deixa arremessar. Também pode ser um popup que o clique não
+        dispensa. O print salvo mostra o que era.
+        """
+        self._print_diagnostico(sct)
+        self._dbg(f"!!! TRAVADO: {self.falhas_arremesso} arremessos falharam seguidos. "
+                  f"Provável INVENTÁRIO CHEIO. Parando e avisando.")
+        self.motivo_parada = ("⚠ TRAVADO — inventário cheio?\n"
+                              "veja falha_arremesso.png")
+        self.rodando = False           # encerra o loop
+        for _ in range(6):             # alarme: você está no jogo, não vê a tela do bot
+            bipe(1200, 200)
+            time.sleep(0.08)
+
     def _clicar(self, dur=DUR_CLIQUE):
         """Clique que o jogo enxerga: segura o botão por alguns ticks.
 
@@ -514,8 +539,13 @@ class App(ctk.CTk):
                 self.falhas_arremesso += 1
                 self._dbg(f"arremesso NAO iniciou em {TEMPO_CARGA}s (sem barra de força) — "
                           f"popup ou linha já na água. falhas seguidas: {self.falhas_arremesso}")
+                # o clique acima já serve p/ dispensar popup de baú/peixe novo;
+                # normalmente resolve em 1-2 tentativas
                 if self.falhas_arremesso == 4:   # tira um print p/ diagnóstico
                     self._print_diagnostico(sct)
+                if self.falhas_arremesso >= MAX_FALHAS_ARREMESSO:
+                    self._alarmar_travado(sct)
+                    return F_ARREMESSAR, agora
                 return F_GUARDANDO, agora   # espera e tenta de novo
             # confirmou que está carregando: completa a força e solta
             time.sleep(max(0.0, TEMPO_CARGA - (time.time() - t0_carga)))
@@ -662,7 +692,10 @@ class App(ctk.CTk):
         # refresh continue. Sem isso um erro isolado mata a UI inteira — foi o
         # que aconteceu quando parar() lançava e a janela travava.
         try:
-            self.lbl_status.configure(text=self.estado)
+            if self.motivo_parada:
+                self.lbl_status.configure(text=self.motivo_parada, text_color="#ff6b6b")
+            else:
+                self.lbl_status.configure(text=self.estado, text_color=("gray10", "gray90"))
             self.lbl_stats.configure(text=f"minigames: {self.capturas}   |   {self.fps} fps")
             if not self.rodando and self.btn_iniciar.cget("text").startswith("⏸"):
                 self.parar()

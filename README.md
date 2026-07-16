@@ -38,6 +38,12 @@ minigame → guarda o peixe → repete.
   aparece perto da boia;
 - Fique de olho na **energia**: pescar gasta stamina e o bot não sabe disso.
 
+**Popups e travamentos:** popups que pedem clique (baú/tesouro, peixe novo,
+recorde de tamanho) o bot dispensa sozinho e continua. Mas se o arremesso
+falhar 12 vezes seguidas, ele assume que travou — o caso clássico é o
+**inventário cheio** — e então **para, toca um alarme** (6 bipes agudos) e
+salva um print da tela em `falha_arremesso.png` mostrando o que travou.
+
 ### Registro estatístico
 
 Na parte de baixo da janela há uma tabela de desempenho **por peixe**:
