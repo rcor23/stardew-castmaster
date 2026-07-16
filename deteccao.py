@@ -81,6 +81,19 @@ def detectar_mordida(frame):
     return False
 
 
+def nivel_barra_forca(frame):
+    """Área amarela (px) da barra de força — cresce conforme a força carrega.
+
+    Serve pra soltar o arremesso NO PICO: em vez de segurar um tempo fixo e
+    torcer, o bot observa a barra encher e solta quando ela começa a descer.
+    """
+    total = 0
+    for (x, y, w, h), area in _blobs_amarelos(frame):
+        if w > LARGURA_MAX_MORDIDA and h > 0 and h / w < 1.0:
+            total += int(area)
+    return total
+
+
 def detectar_barra_forca(frame):
     """True se a BARRA DE FORÇA do arremesso está na tela.
 

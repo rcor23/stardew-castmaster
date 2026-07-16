@@ -32,7 +32,7 @@ import pydirectinput
 import customtkinter as ctk
 from PIL import Image
 
-from deteccao import detectar, detectar_mordida, detectar_barra_forca
+from deteccao import detectar, detectar_mordida, detectar_barra_forca, nivel_barra_forca
 from imgio import imwrite_u
 from wiki import Wiki
 
@@ -257,7 +257,7 @@ class App(ctk.CTk):
         self.title("Stardew CastMaster")
         # Medido: o conteúdo pede 519x870. Antes a janela era mais baixa e a
         # tabela de estatísticas ficava cortada.
-        self.geometry("640x890")
+        self.geometry("640x960")
         self.resizable(False, False)
 
         # estado compartilhado com a thread do bot
@@ -273,6 +273,9 @@ class App(ctk.CTk):
         # segundos de antecipação do controle preditivo. A barra leva ~1.6s p/
         # reverter a queda (medido), então ~0.45s à frente evita o overshoot.
         self.antecipacao = 0.45
+        # % da força do arremesso. 100% = distância máxima = +1 nível na zona
+        # de pesca do jogo, o que facilita o minigame.
+        self.forca = 100
         self.proc_calib = None  # processo da calibração (evita abrir vários)
         self.janela_wiki = None
         self.falhas_arremesso = 0
@@ -352,6 +355,10 @@ class App(ctk.CTk):
             self.zona_morta = int(p["zona_morta"])
             self.sl_zona.set(self.zona_morta)
             self.lbl_zona.configure(text=f"{self.zona_morta} px")
+        if "forca" in p:
+            self.forca = int(p["forca"])
+            self.sl_forca.set(self.forca)
+            self.lbl_forca.configure(text=f"{self.forca} %")
 
     def _salvar_prefs(self):
         try:
@@ -362,6 +369,7 @@ class App(ctk.CTk):
                     "peixe": self.ent_peixe.get().strip(),
                     "antecipacao": self.antecipacao,
                     "zona_morta": self.zona_morta,
+                    "forca": self.forca,
                     "hotkey": self.prefs.get("hotkey", HOTKEY_PADRAO),
                 }, f, indent=2)
         except Exception:
@@ -507,6 +515,10 @@ class App(ctk.CTk):
         self.sl_ant, self.lbl_ant = self._slider(
             c2, "Antecipação", "s", 0.0, 1.0, self.antecipacao, self._mudou_ant,
             "mira onde a barra VAI estar — evita o efeito sanfona")
+        self.sl_forca, self.lbl_forca = self._slider(
+            c2, "Força do arremesso", "%", 30, 100, self.forca, self._mudou_forca,
+            "100% arremessa na distância máxima: +1 nível na zona de pesca",
+            passos=70)
 
         tiles = ctk.CTkFrame(dir_, fg_color="transparent")
         tiles.pack(fill="x")
@@ -559,6 +571,10 @@ class App(ctk.CTk):
     def _mudou_ant(self, v):
         self.antecipacao = float(v)
         self.lbl_ant.configure(text=f"{self.antecipacao:.2f} s")
+
+    def _mudou_forca(self, v):
+        self.forca = int(v)
+        self.lbl_forca.configure(text=f"{self.forca} %")
 
     # ---------- hotkey global ----------
     def _registrar_hotkey(self, tecla):
@@ -951,11 +967,25 @@ class App(ctk.CTk):
                     self._alarmar_travado(sct)
                     return F_ARREMESSAR, agora
                 return F_GUARDANDO, agora   # espera e tenta de novo
-            # confirmou que está carregando: completa a força e solta
-            time.sleep(max(0.0, TEMPO_CARGA - (time.time() - t0_carga)))
+            # confirmou que está carregando: leva até a força desejada e solta
+            if self.forca >= 99:
+                # observa a barra encher e solta no PICO: quando a área amarela
+                # começa a diminuir, o medidor passou do máximo
+                pico = 0
+                t_lim = time.time() + 2.5   # trava de segurança
+                while time.time() < t_lim:
+                    n = nivel_barra_forca(np.array(sct.grab(self.reg_mordida))[:, :, :3])
+                    if n > pico:
+                        pico = n
+                    elif pico > 0 and n < pico * 0.97:
+                        break               # começou a descer: solta já
+                    time.sleep(0.02)
+            else:
+                time.sleep(max(0.0, TEMPO_CARGA * (self.forca / 100.0)
+                                - (time.time() - t0_carga)))
             pydirectinput.mouseUp()         # solta = arremessa
             self.falhas_arremesso = 0
-            self._dbg(f"ARREMESSO confirmado (barra de força vista) "
+            self._dbg(f"ARREMESSO confirmado (força {self.forca}%) "
                       f"cursor={pyautogui.position()}")
             return F_BOIA, time.time()
 
