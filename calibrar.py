@@ -4,7 +4,9 @@ ETAPA 1 — Calibração (v2).
 
 Descobre onde a barra de pesca fica na SUA tela e salva:
   - config.json  -> coordenadas da região do minigame
-  - peixe.png    -> template (recorte) do ícone do peixe
+
+Só isso: a detecção da barra e do peixe é por COR (ver deteccao.py), então
+não existe mais template pra recortar.
 
 COMO FUNCIONA (v2):
   Nada é mostrado na tela enquanto captura — isso evita o "efeito espelho"
@@ -15,7 +17,7 @@ COMO FUNCIONA (v2):
   2. Tem DURACAO segundos pra voltar ao jogo, jogar a vara e fisgar;
   3. O script tira vários prints silenciosos nesse tempo;
   4. Só DEPOIS abre uma janelinha pra você escolher o print que pegou
-     o minigame e marcar a barra e o peixe.
+     o minigame e marcar a trilha.
 
 Como usar:
   1. Abra o Stardew Valley em MODO JANELA (zoom e escala de UI em 100%).
@@ -30,7 +32,6 @@ import cv2
 import numpy as np
 import mss
 
-from imgio import imwrite_u
 
 try:
     import winsound
@@ -47,7 +48,6 @@ PASTA = Path(__file__).parent
 DURACAO = 25       # segundos capturando (tempo pra você fisgar)
 FPS = 2            # prints por segundo
 MAX_W, MAX_H = 1500, 800   # p/ a janela de seleção caber na tela
-ZOOM_PEIXE = 4     # ampliação na hora de recortar o peixe
 
 
 def capturar_frames(sct, monitor):
@@ -157,31 +157,11 @@ def main():
             print("Cancelado.")
             return
 
-        print(" Selecione a REGIÃO DA BARRA do minigame (a régua vertical inteira) e aperte ENTER.")
-        x, y, w, h = selecionar(frame, "selecione a barra do minigame")
+        print(" Marque a TRILHA INTEIRA do minigame (de cima até embaixo!) e aperte ENTER.")
+        print(" ATENÇÃO: a trilha é bem mais alta do que parece — pegue tudo.")
+        x, y, w, h = selecionar(frame, "marque a TRILHA INTEIRA do minigame")
         if w == 0 or h == 0:
             print("Nenhuma região selecionada. Cancelado.")
-            return
-
-        região = frame[y : y + h, x : x + w]
-
-        # amplia a região p/ marcar o peixe com precisão (sem estourar a tela)
-        z = ZOOM_PEIXE
-        while z > 1 and (região.shape[1] * z > MAX_W or região.shape[0] * z > MAX_H):
-            z -= 1
-        ampliada = cv2.resize(região, None, fx=z, fy=z, interpolation=cv2.INTER_NEAREST)
-
-        print(" Agora selecione só o ÍCONE DO PEIXE e aperte ENTER.")
-        r = cv2.selectROI("selecione o peixe", ampliada, showCrosshair=True)
-        cv2.destroyAllWindows()
-        fx, fy, fw, fh = (int(round(v / z)) for v in r)
-        if fw == 0 or fh == 0:
-            print("Nenhum peixe selecionado. Cancelado.")
-            return
-
-        peixe = região[fy : fy + fh, fx : fx + fw]
-        if not imwrite_u(PASTA / "peixe.png", peixe):
-            print(" ERRO: não consegui salvar peixe.png")
             return
 
         config = {
@@ -195,7 +175,6 @@ def main():
 
         print()
         print(f" OK! Região salva em config.json: {config}")
-        print(f" Template do peixe salvo em peixe.png ({peixe.shape[1]}x{peixe.shape[0]} px)")
         print(" Pode fechar esta janela e voltar para o CastMaster.")
 
 

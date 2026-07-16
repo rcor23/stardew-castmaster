@@ -9,7 +9,7 @@ Tudo em um lugar só:
   - Botão Iniciar/Parar
   - Switch "Controlar o mouse" (desligado = só observa, modo detecção)
   - Preview ao vivo do que o bot enxerga
-  - Sliders de ajuste fino (zona morta e limiar do peixe)
+  - Slider de ajuste fino (zona morta)
   - REGISTRO ESTATÍSTICO por peixe (tentativas, taxa de sucesso,
     tempo médio e "controle %"), salvo em estatisticas.json
 
@@ -32,7 +32,6 @@ import customtkinter as ctk
 from PIL import Image
 
 from deteccao import detectar
-from imgio import imread_u
 
 PASTA = Path(__file__).parent
 ARQ_STATS = PASTA / "estatisticas.json"
@@ -60,7 +59,6 @@ class App(ctk.CTk):
         self.fps = 0
         self.capturas = 0
         self.zona_morta = 6
-        self.limiar = 0.55
         self.proc_calib = None  # processo da calibração (evita abrir vários)
 
         # estatísticas
@@ -124,13 +122,6 @@ class App(ctk.CTk):
         self.lbl_zona = ctk.CTkLabel(dir_, text=f"{self.zona_morta}")
         self.lbl_zona.pack(padx=16, anchor="e")
 
-        ctk.CTkLabel(dir_, text="Limiar do peixe").pack(padx=16, pady=(6, 0), anchor="w")
-        self.sl_limiar = ctk.CTkSlider(dir_, from_=0.30, to=0.90, command=self._mudou_limiar)
-        self.sl_limiar.set(self.limiar)
-        self.sl_limiar.pack(fill="x", padx=16)
-        self.lbl_limiar = ctk.CTkLabel(dir_, text=f"{self.limiar:.2f}")
-        self.lbl_limiar.pack(padx=16, anchor="e")
-
         self.lbl_stats = ctk.CTkLabel(dir_, text="minigames: 0   |   0 fps")
         self.lbl_stats.pack(pady=(16, 4))
 
@@ -166,10 +157,6 @@ class App(ctk.CTk):
         self.zona_morta = int(v)
         self.lbl_zona.configure(text=f"{self.zona_morta}")
 
-    def _mudou_limiar(self, v):
-        self.limiar = float(v)
-        self.lbl_limiar.configure(text=f"{self.limiar:.2f}")
-
     # ---------- ações ----------
     def abrir_calibracao(self):
         # já tem uma calibração aberta? não abre outra.
@@ -195,8 +182,6 @@ class App(ctk.CTk):
         try:
             with open(PASTA / "config.json") as f:
                 self.região = json.load(f)
-            self.template = imread_u(PASTA / "peixe.png", cv2.IMREAD_GRAYSCALE)
-            assert self.template is not None
         except Exception:
             self.lbl_status.configure(text="⚠ calibre primeiro!")
             return
@@ -299,7 +284,7 @@ class App(ctk.CTk):
             with mss.mss() as sct:
                 while self.rodando:
                     frame = np.array(sct.grab(self.região))[:, :, :3].copy()
-                    barra_y, barra_rect, peixe_y, peixe_rect = detectar(frame, self.template, self.limiar)
+                    barra_y, barra_rect, peixe_y, peixe_rect = detectar(frame)
                     ativo = barra_y is not None and peixe_y is not None
 
                     if ativo:

@@ -26,7 +26,6 @@ import pyautogui
 import pydirectinput
 
 from deteccao import detectar
-from imgio import imread_u
 
 PASTA = Path(__file__).parent
 
@@ -38,11 +37,6 @@ ZONA_MORTA = 6  # pixels de tolerância em volta do centro da barra
 def main():
     with open(PASTA / "config.json") as f:
         região = json.load(f)
-    template = imread_u(PASTA / "peixe.png", cv2.IMREAD_GRAYSCALE)
-    if template is None:
-        print("peixe.png não encontrado — rode calibrar.py primeiro.")
-        return
-
     print("Bot rodando. Jogue a vara e fisgue — eu cuido do minigame.")
     print("Q na janela 'bot' encerra | mouse no canto da tela aborta.")
 
@@ -54,7 +48,7 @@ def main():
         with mss.mss() as sct:
             while True:
                 frame = np.array(sct.grab(região))[:, :, :3].copy()
-                barra_y, barra_rect, peixe_y, peixe_rect = detectar(frame, template)
+                barra_y, barra_rect, peixe_y, peixe_rect = detectar(frame)
 
                 ativo = barra_y is not None and peixe_y is not None
 

@@ -1,20 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-ETAPA 2 — Teste de detecção (NÃO clica em nada!).
+Detecção da barra e do peixe — por COR (HSV).
 
-Mostra em tempo real o que o bot está "enxergando":
-  - retângulo VERDE  = barra verde do jogador
-  - retângulo VERMELHO = peixe encontrado por template matching
-  - FPS e status no topo
+Por que por cor e não por template matching:
+  medimos os pixels reais do minigame (ver amostra.py) e descobrimos que a
+  barra do jogador e o peixe ocupam faixas de matiz BEM separadas:
 
-Como testar:
-  1. Rode: python deteccao.py
-  2. Vá pescar manualmente no jogo.
-  3. Observe a janela "deteccao": os dois retângulos devem seguir a barra
-     e o peixe o minigame INTEIRO, sem piscar nem pular.
-  Se a detecção estiver ruim, ajuste LIMIAR_PEIXE ou refaça a calibração.
+      barra do jogador : hue 40-70   (verde-amarelado, bem saturado)
+      peixe            : hue 80-100  (ciano, muito saturado)
+      água da trilha   : hue 110-125 (azul)
+      alga do fundo    : verde escuro (barrada pelo brilho mínimo)
 
-Aperte Q na janela para sair.
+  Medido em 20 frames reais de minigame: peixe 100%, barra 95%.
+
+  O template matching foi abandonado porque o recorte do peixe levava junto
+  o fundo verde da barra, e aí a confiança despencava justo quando o peixe
+  saía da barra — que é quando o bot mais precisa enxergar.
+
+Teste visual (não clica em nada):
+  python deteccao.py
 """
 import json
 import time
@@ -24,45 +28,50 @@ import cv2
 import numpy as np
 import mss
 
-from imgio import imread_u
-
 PASTA = Path(__file__).parent
 
-# faixa de verde (HSV) da barra do jogador
-VERDE_MIN = np.array([35, 80, 80])
-VERDE_MAX = np.array([85, 255, 255])
+# --- barra verde do jogador ---
+BARRA_MIN = np.array([40, 100, 150])
+BARRA_MAX = np.array([70, 255, 255])
+AREA_MIN_BARRA = 300     # px; abaixo disso não é a barra (é alga/ruído)
+LARGURA_MIN_BARRA = 20   # a barra ocupa quase toda a largura da trilha
 
-# confiança mínima do template matching do peixe (0 a 1)
-LIMIAR_PEIXE = 0.55
+# --- peixe (ciano) ---
+PEIXE_MIN = np.array([80, 120, 120])
+PEIXE_MAX = np.array([100, 255, 255])
+AREA_MIN_PEIXE = 40
 
-# quantos pixels verdes indicam que o minigame está aberto
-MIN_PIXELS_VERDES = 200
+
+def _maior_blob(mask, area_min):
+    """Devolve (x, y, w, h) do maior contorno acima de area_min, ou None."""
+    contornos, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contornos = [c for c in contornos if cv2.contourArea(c) >= area_min]
+    if not contornos:
+        return None
+    return cv2.boundingRect(max(contornos, key=cv2.contourArea))
 
 
-def detectar(frame, template, limiar=None):
-    """Retorna (barra_y, barra_rect, peixe_y, peixe_rect) — None quando não achou."""
-    if limiar is None:
-        limiar = LIMIAR_PEIXE
+def detectar(frame):
+    """Acha a barra e o peixe no recorte da trilha.
+
+    Retorna (barra_y, barra_rect, peixe_y, peixe_rect); cada um é None se
+    não foi encontrado. Os *_y são o centro vertical, em px do recorte.
+    """
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, VERDE_MIN, VERDE_MAX)
 
     barra_y = barra_rect = None
-    if cv2.countNonZero(mask) >= MIN_PIXELS_VERDES:
-        contornos, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        maior = max(contornos, key=cv2.contourArea)
-        bx, by, bw, bh = cv2.boundingRect(maior)
-        barra_y = by + bh // 2
-        barra_rect = (bx, by, bw, bh)
-
-    cinza = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    res = cv2.matchTemplate(cinza, template, cv2.TM_CCOEFF_NORMED)
-    _, conf, _, loc = cv2.minMaxLoc(res)
+    r = _maior_blob(cv2.inRange(hsv, BARRA_MIN, BARRA_MAX), AREA_MIN_BARRA)
+    if r is not None and r[2] >= LARGURA_MIN_BARRA:
+        x, y, w, h = r
+        barra_y = y + h // 2
+        barra_rect = r
 
     peixe_y = peixe_rect = None
-    if conf >= limiar:
-        th, tw = template.shape[:2]
-        peixe_y = loc[1] + th // 2
-        peixe_rect = (loc[0], loc[1], tw, th)
+    r = _maior_blob(cv2.inRange(hsv, PEIXE_MIN, PEIXE_MAX), AREA_MIN_PEIXE)
+    if r is not None:
+        x, y, w, h = r
+        peixe_y = y + h // 2
+        peixe_rect = r
 
     return barra_y, barra_rect, peixe_y, peixe_rect
 
@@ -70,29 +79,26 @@ def detectar(frame, template, limiar=None):
 def main():
     with open(PASTA / "config.json") as f:
         região = json.load(f)
-    template = imread_u(PASTA / "peixe.png", cv2.IMREAD_GRAYSCALE)
-    if template is None:
-        print("peixe.png não encontrado — rode calibrar.py primeiro.")
-        return
 
+    print("Teste de detecção (não clica em nada). Q na janela para sair.")
     with mss.mss() as sct:
-        t0, frames, fps = time.time(), 0, 0.0
+        t0, frames, fps = time.time(), 0, 0
         while True:
             frame = np.array(sct.grab(região))[:, :, :3].copy()
-            barra_y, barra_rect, peixe_y, peixe_rect = detectar(frame, template)
+            barra_y, barra_rect, peixe_y, peixe_rect = detectar(frame)
 
             if barra_rect:
-                bx, by, bw, bh = barra_rect
-                cv2.rectangle(frame, (bx, by), (bx + bw, by + bh), (0, 255, 0), 2)
+                x, y, w, h = barra_rect
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             if peixe_rect:
-                px, py, pw, ph = peixe_rect
-                cv2.rectangle(frame, (px, py), (px + pw, py + ph), (0, 0, 255), 2)
+                x, y, w, h = peixe_rect
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
 
             frames += 1
             if time.time() - t0 >= 1.0:
                 fps, frames, t0 = frames, 0, time.time()
-            status = f"{fps} fps | barra: {'OK' if barra_y is not None else '--'} | peixe: {'OK' if peixe_y is not None else '--'}"
-            cv2.putText(frame, status, (5, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
+            txt = f"{fps}fps b:{'OK' if barra_y else '--'} p:{'OK' if peixe_y else '--'}"
+            cv2.putText(frame, txt, (3, 14), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
 
             cv2.imshow("deteccao", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
