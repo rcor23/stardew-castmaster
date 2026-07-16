@@ -34,6 +34,7 @@ from PIL import Image
 
 from deteccao import detectar, detectar_mordida, detectar_barra_forca
 from imgio import imwrite_u
+from wiki import Wiki
 
 try:
     import keyboard  # hotkey global: liga/desliga sem sair do jogo
@@ -168,6 +169,7 @@ class App(ctk.CTk):
         # reverter a queda (medido), então ~0.45s à frente evita o overshoot.
         self.antecipacao = 0.45
         self.proc_calib = None  # processo da calibração (evita abrir vários)
+        self.janela_wiki = None
         self.falhas_arremesso = 0
         self.motivo_parada = None   # texto do alarme quando o bot para sozinho
         self.hotkey_atual = None
@@ -362,7 +364,13 @@ class App(ctk.CTk):
                                           fg_color="transparent", border_width=1,
                                           border_color=COR_BORDA, text_color=COR_ICONE,
                                           hover_color=COR_CARTAO_ALT, command=self.abrir_calibracao)
-        self.btn_calibrar.pack(fill="x", padx=14, pady=(0, 10))
+        self.btn_calibrar.pack(fill="x", padx=14, pady=(0, 4))
+
+        self.btn_wiki = ctk.CTkButton(c1, text="≡   Peixes", height=30, corner_radius=8,
+                                      fg_color="transparent", border_width=1,
+                                      border_color=COR_BORDA, text_color=COR_ICONE,
+                                      hover_color=COR_CARTAO_ALT, command=self.abrir_wiki)
+        self.btn_wiki.pack(fill="x", padx=14, pady=(0, 10))
 
         self.sw_mouse = ctk.CTkSwitch(c1, text="Controlar o mouse", font=ctk.CTkFont(size=12))
         self.sw_mouse.select()
@@ -507,6 +515,16 @@ class App(ctk.CTk):
         self._salvar_prefs()
 
     # ---------- ações ----------
+    def abrir_wiki(self):
+        """Abre a wiki de peixes, passando o seu histórico junto."""
+        if self.janela_wiki is not None and self.janela_wiki.winfo_exists():
+            self.janela_wiki.lift()      # já aberta: só traz pra frente
+            self.janela_wiki.focus()
+            return
+        cores = {"fundo": COR_CARTAO_ALT, "cartao": COR_CARTAO,
+                 "cartao_alt": COR_CARTAO_ALT, "borda": COR_BORDA, "fraca": COR_FRACA}
+        self.janela_wiki = Wiki(self, cores, self.log)
+
     def abrir_calibracao(self):
         # já tem uma calibração aberta? não abre outra.
         if self.proc_calib is not None and self.proc_calib.poll() is None:
