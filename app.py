@@ -355,7 +355,10 @@ class App(ctk.CTk):
                                          font=ctk.CTkFont(size=14, weight="bold"),
                                          command=self.alternar)
         self.btn_iniciar.pack(fill="x", padx=14, pady=(4, 6))
-        self.btn_calibrar = ctk.CTkButton(c1, text="◎   Calibrar", height=30, corner_radius=8,
+        # ⛶ = colchetes de canto; lê como "enquadrar uma área", que é o que a
+        # calibração faz. Testados lado a lado: emoji (🎯) vira borrão no Tk, e
+        # os círculos (◎/⦿) saem fracos e não comunicam nada.
+        self.btn_calibrar = ctk.CTkButton(c1, text="⛶   Calibrar", height=30, corner_radius=8,
                                           fg_color="transparent", border_width=1,
                                           border_color=COR_BORDA, text_color=COR_ICONE,
                                           hover_color=COR_CARTAO_ALT, command=self.abrir_calibracao)
