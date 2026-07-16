@@ -87,6 +87,16 @@ PREVIEW_MAX = (110, 430)  # tamanho máximo da preview (largura, altura)
 
 pyautogui.FAILSAFE = True
 
+# Sem um AppUserModelID próprio, o Windows agrupa a janela sob o python.exe e
+# mostra o logo do Python na barra de tarefas, ignorando o iconbitmap(). Precisa
+# ser declarado ANTES da janela existir.
+try:
+    import ctypes
+
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("rcor23.stardew.castmaster")
+except Exception:
+    pass
+
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("green")
 
@@ -180,6 +190,25 @@ class App(ctk.CTk):
         self._montar_ui()
         self._aplicar_prefs()
         self._atualizar_ui()
+        self._por_icone()
+
+    def _por_icone(self):
+        """Ícone da janela e da barra de tarefas.
+
+        O customtkinter aplica um ícone próprio ~200ms depois de abrir, então
+        aplicar o nosso agora seria sobrescrito. Por isso o atraso.
+        """
+        ico = PASTA / "icone.ico"
+        if not ico.exists():
+            return
+        self.after(300, lambda: self._tentar_icone(ico))
+
+    def _tentar_icone(self, ico):
+        try:
+            self.iconbitmap(str(ico))            # esta janela
+            self.iconbitmap(default=str(ico))    # e as filhas (diálogos)
+        except Exception as e:
+            self._dbg(f"não consegui aplicar o ícone: {e}")
 
     # ---------- diário de bordo (diagnóstico) ----------
     def _dbg(self, msg):

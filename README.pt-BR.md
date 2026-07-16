@@ -1,3 +1,5 @@
+<img src="icone.png" width="120" align="right" alt="CastMaster" />
+
 # Stardew CastMaster 🎣
 
 Bot de pesca externo para Stardew Valley. Lê a tela com OpenCV e controla o

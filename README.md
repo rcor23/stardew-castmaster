@@ -1,3 +1,5 @@
+<img src="icone.png" width="120" align="right" alt="CastMaster" />
+
 # Stardew CastMaster 🎣
 
 An external fishing bot for Stardew Valley. It reads the screen with OpenCV and
