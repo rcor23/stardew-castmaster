@@ -51,11 +51,16 @@ F_MINIGAME = "MINIGAME"
 F_GUARDANDO = "guardando o peixe"
 
 ESPERA_INICIO = 5.0     # s após clicar em Iniciar, p/ você voltar o foco ao jogo
+# O Stardew lê o estado do botão a cada tick (~16ms). Um pydirectinput.click()
+# faz down+up em menos de 1ms e cai ENTRE os ticks — o jogo simplesmente não vê.
+# Foi por isso que a fisgada falhava mas o arremesso (que segura 0.65s) pegava.
+DUR_CLIQUE = 0.10       # s segurando o botão num clique "normal"
 TEMPO_CARGA = 0.65      # s segurando o clique p/ arremessar (define a distância)
 ESPERA_BOIA = 1.8       # s até a boia cair na água
 TIMEOUT_MORDIDA = 45    # s sem morder -> arremessa de novo
 ESPERA_POS = 3.0        # s depois do minigame antes do próximo arremesso
 TIMEOUT_FISGADO = 6.0   # s esperando o minigame abrir depois de fisgar
+VEL_MAX = 600.0         # px/s; acima disso e glitch de deteccao (real vai ate ~450)
 
 PASTA = Path(__file__).parent
 ARQ_STATS = PASTA / "estatisticas.json"
@@ -250,6 +255,7 @@ class App(ctk.CTk):
                 self.região = json.load(f)
             # região do "!" é opcional: sem ela, só o modo manual funciona
             self.reg_mordida = self.região.get("mordida")
+            self.altura_trilha = self.região["height"]
         except Exception:
             self.lbl_status.configure(text="⚠ calibre primeiro!")
             return
@@ -352,6 +358,17 @@ class App(ctk.CTk):
         self.txt_tabela.configure(state="disabled")
 
     # ---------- lógica do bot (rodam na thread) ----------
+    def _clicar(self, dur=DUR_CLIQUE):
+        """Clique que o jogo enxerga: segura o botão por alguns ticks.
+
+        pydirectinput.click() faz down+up instantâneo e o Stardew não registra
+        (comprovado no debug.log: a fisgada por click() falhava sempre, mas o
+        arremesso, que segura 0.65s, hookava o peixe sem querer).
+        """
+        pydirectinput.mouseDown()
+        time.sleep(dur)
+        pydirectinput.mouseUp()
+
     def _jogar_minigame(self, barra_y, peixe_y, vel, segurando):
         """Segura/solta o clique pra levar a barra verde até o peixe.
 
@@ -371,7 +388,11 @@ class App(ctk.CTk):
             self.estado = "observando"
             return segurando
 
+        # Um frame de detecção ruim gera velocidade absurda (o log real teve
+        # +1946px/s, prevendo a barra em 1406 numa trilha de 575px). Limita a
+        # previsão à trilha para que um glitch não vire uma decisão maluca.
         prevista = barra_y + vel * self.antecipacao
+        prevista = max(0.0, min(float(self.altura_trilha), prevista))
         if peixe_y < prevista - self.zona_morta and not segurando:
             pydirectinput.mouseDown()   # vai parar abaixo do peixe -> sobe mais
             segurando = True
@@ -408,8 +429,8 @@ class App(ctk.CTk):
 
         if fase == F_GUARDANDO:
             if agora - t_fase >= ESPERA_POS:
-                self._dbg("click p/ dispensar popup do peixe")
-                pydirectinput.click()      # dispensa o popup do peixe pescado
+                self._dbg("clique p/ dispensar popup do peixe")
+                self._clicar()             # dispensa o popup do peixe pescado
                 time.sleep(0.3)
                 return F_ARREMESSAR, time.time()
 
@@ -429,8 +450,8 @@ class App(ctk.CTk):
         elif fase == F_MORDIDA:
             fm = np.array(sct.grab(self.reg_mordida))[:, :, :3]
             if detectar_mordida(fm):
-                self._dbg("'!' DETECTADO -> click p/ fisgar")
-                pydirectinput.click()      # fisga!
+                self._dbg(f"'!' DETECTADO -> fisgando (segura {DUR_CLIQUE}s)")
+                self._clicar()             # fisga!
                 return F_FISGADO, agora
             if agora - t_fase >= TIMEOUT_MORDIDA:
                 self._dbg(f"timeout: {TIMEOUT_MORDIDA}s sem mordida -> rearremessa")
@@ -488,9 +509,12 @@ class App(ctk.CTk):
                             barra_ant, t_ant, vel = None, agora, 0.0
                             self._dbg("=== MINIGAME ABRIU ===")
 
-                        # velocidade da barra (px/s), suavizada p/ tirar ruído
+                        # velocidade da barra (px/s), suavizada p/ tirar ruído.
+                        # Limitada porque a barra real não passa de ~450 px/s:
+                        # valores acima disso são glitch de detecção, não física.
                         if barra_ant is not None and agora > t_ant:
                             v_inst = (barra_y - barra_ant) / (agora - t_ant)
+                            v_inst = max(-VEL_MAX, min(VEL_MAX, v_inst))
                             vel = 0.6 * vel + 0.4 * v_inst
                         barra_ant, t_ant = barra_y, agora
 
@@ -522,7 +546,9 @@ class App(ctk.CTk):
                         elif not minigame_ativo:
                             if auto:
                                 fase, t_fase = self._passo_auto(sct, fase, t_fase)
-                                self.estado = fase
+                                # mostra o tempo na fase: sem isso "esperando a
+                                # mordida" por 40s parece que o bot travou
+                                self.estado = f"{fase} ({int(time.time()-t_fase)}s)" 
                             else:
                                 fase = None
                                 self.estado = "marque ✓/✗" if self.pendente else "esperando..."
