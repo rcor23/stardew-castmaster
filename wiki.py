@@ -13,8 +13,10 @@ import json
 from pathlib import Path
 
 import customtkinter as ctk
+from PIL import Image
 
 PASTA = Path(__file__).parent
+SPRITES = PASTA / "sprites"
 
 # cores por tipo de movimento — cada um exige uma resposta diferente do bot
 COR_MOV = {
@@ -31,6 +33,11 @@ EXPLICA_MOV = {
     "sinker": "Tende a afundar para a parte de baixo.",
     "dart": "Arranca de repente. O mais difícil pro bot acompanhar.",
 }
+
+
+def slug(nome):
+    """Nome do peixe -> nome do arquivo do sprite."""
+    return nome.lower().replace(" ", "_").replace(".", "").replace("'", "")
 
 
 def cor_dificuldade(d):
@@ -57,6 +64,9 @@ class Wiki(ctk.CTkToplevel):
         self.peixes = self._carregar()
         self.filtrados = list(self.peixes)
         self.sel = None
+        # o CTkImage precisa ficar vivo, senão o garbage collector come o sprite
+        # e a imagem some da tela. Guarda por (nome, tamanho).
+        self.cache_img = {}
 
         self._montar()
         if self.filtrados:
@@ -72,6 +82,24 @@ class Wiki(ctk.CTkToplevel):
                 self.iconbitmap(str(ico))
             except Exception:
                 pass
+
+    def _sprite(self, nome, px):
+        """CTkImage do peixe no tamanho pedido, ou None se não tiver sprite."""
+        chave = (nome, px)
+        if chave in self.cache_img:
+            return self.cache_img[chave]
+        arq = SPRITES / f"{slug(nome)}.png"
+        if not arq.exists():
+            return None
+        try:
+            im = Image.open(arq).convert("RGBA")
+            # NEAREST: os sprites são pixel art de 48x48; suavizar borra tudo
+            im = im.resize((px, px), Image.NEAREST)
+            img = ctk.CTkImage(light_image=im, dark_image=im, size=(px, px))
+        except Exception:
+            return None
+        self.cache_img[chave] = img
+        return img
 
     def _carregar(self):
         try:
@@ -151,6 +179,7 @@ class Wiki(ctk.CTkToplevel):
         linha.pack(fill="x", pady=1)
         b = ctk.CTkButton(
             linha, text=f"  {p['nome']}", anchor="w", height=30, corner_radius=6,
+            image=self._sprite(p["nome"], 24), compound="left",
             fg_color="transparent", hover_color=c["cartao"], text_color="#e8ecf3",
             font=ctk.CTkFont(size=12), command=lambda: self._escolher(p))
         b.pack(side="left", fill="x", expand=True)
@@ -166,10 +195,20 @@ class Wiki(ctk.CTkToplevel):
         for w in self.dir.winfo_children():
             w.destroy()
 
-        ctk.CTkLabel(self.dir, text=p["nome"], font=ctk.CTkFont(size=24, weight="bold"),
-                     anchor="w").pack(fill="x", padx=20, pady=(18, 0))
-        ctk.CTkLabel(self.dir, text=p["grupo"], font=ctk.CTkFont(size=11),
-                     text_color=c["fraca"], anchor="w").pack(fill="x", padx=20, pady=(0, 14))
+        # cabeçalho: sprite grande + nome
+        topo = ctk.CTkFrame(self.dir, fg_color="transparent")
+        topo.pack(fill="x", padx=20, pady=(16, 12))
+        sp = self._sprite(p["nome"], 72)
+        if sp:
+            moldura = ctk.CTkFrame(topo, corner_radius=8, fg_color=c["cartao_alt"])
+            moldura.pack(side="left", padx=(0, 14))
+            ctk.CTkLabel(moldura, image=sp, text="").pack(padx=8, pady=8)
+        nomes = ctk.CTkFrame(topo, fg_color="transparent")
+        nomes.pack(side="left", fill="both", expand=True)
+        ctk.CTkLabel(nomes, text=p["nome"], font=ctk.CTkFont(size=24, weight="bold"),
+                     anchor="w").pack(fill="x", pady=(8, 0))
+        ctk.CTkLabel(nomes, text=p["grupo"], font=ctk.CTkFont(size=11),
+                     text_color=c["fraca"], anchor="w").pack(fill="x")
 
         for rotulo, valor in [("Onde", p["local"]), ("Estação", p["estacao"]),
                               ("Horário", p["tempo"]), ("Clima", p["clima"])]:
