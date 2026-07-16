@@ -108,7 +108,8 @@ COR_BOTAO = ctk.ThemeManager.theme["CTkButton"]["fg_color"]
 COR_CARTAO = "#212936"
 COR_CARTAO_ALT = "#1a212c"
 COR_BORDA = "#3a4557"
-COR_FRACA = "#7d8ba1"
+COR_FRACA = "#7d8ba1"      # legendas e textos secundarios
+COR_ICONE = "#c3ccda"      # icones de acao: a COR_FRACA some no fundo escuro
 COR_OK = "#2b7a2b"
 COR_ERRO = "#a33"
 COR_PARADO = "#4a5568"
@@ -354,9 +355,9 @@ class App(ctk.CTk):
                                          font=ctk.CTkFont(size=14, weight="bold"),
                                          command=self.alternar)
         self.btn_iniciar.pack(fill="x", padx=14, pady=(4, 6))
-        self.btn_calibrar = ctk.CTkButton(c1, text="🎯   Calibrar", height=30, corner_radius=8,
+        self.btn_calibrar = ctk.CTkButton(c1, text="◎   Calibrar", height=30, corner_radius=8,
                                           fg_color="transparent", border_width=1,
-                                          border_color=COR_BORDA, text_color=COR_FRACA,
+                                          border_color=COR_BORDA, text_color=COR_ICONE,
                                           hover_color=COR_CARTAO_ALT, command=self.abrir_calibracao)
         self.btn_calibrar.pack(fill="x", padx=14, pady=(0, 10))
 
@@ -375,7 +376,7 @@ class App(ctk.CTk):
         self.btn_hotkey = ctk.CTkButton(lh, text="trocar", width=58, height=24,
                                         corner_radius=6, fg_color="transparent",
                                         border_width=1, border_color=COR_BORDA,
-                                        text_color=COR_FRACA, font=ctk.CTkFont(size=11),
+                                        text_color=COR_ICONE, font=ctk.CTkFont(size=11),
                                         hover_color=COR_CARTAO_ALT, command=self._trocar_hotkey)
         self.btn_hotkey.pack(side="right")
         self.lbl_hotkey = ctk.CTkLabel(lh, text=HOTKEY_PADRAO.upper(),
@@ -418,7 +419,8 @@ class App(ctk.CTk):
         self.btn_escapou.pack(side="left", padx=3)
         self.btn_limpar = ctk.CTkButton(linha, text="🗑", width=34, height=30, corner_radius=8,
                                         fg_color="transparent", border_width=1,
-                                        border_color=COR_BORDA, text_color=COR_FRACA,
+                                        border_color=COR_BORDA, text_color=COR_ICONE,
+                                        font=ctk.CTkFont(size=15),
                                         hover_color=COR_CARTAO_ALT, command=self.limpar_stats)
         self.btn_limpar.pack(side="right")
 
