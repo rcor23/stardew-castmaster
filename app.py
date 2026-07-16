@@ -31,7 +31,21 @@ import pydirectinput
 import customtkinter as ctk
 from PIL import Image
 
-from deteccao import detectar
+from deteccao import detectar, detectar_mordida
+
+# --- fases do ciclo automático ---
+F_ARREMESSAR = "arremessando"
+F_BOIA = "esperando a boia"
+F_MORDIDA = "esperando a mordida"
+F_FISGADO = "fisgou!"
+F_MINIGAME = "MINIGAME"
+F_GUARDANDO = "guardando o peixe"
+
+TEMPO_CARGA = 0.65      # s segurando o clique p/ arremessar (define a distância)
+ESPERA_BOIA = 1.8       # s até a boia cair na água
+TIMEOUT_MORDIDA = 45    # s sem morder -> arremessa de novo
+ESPERA_POS = 3.0        # s depois do minigame antes do próximo arremesso
+TIMEOUT_FISGADO = 6.0   # s esperando o minigame abrir depois de fisgar
 
 PASTA = Path(__file__).parent
 ARQ_STATS = PASTA / "estatisticas.json"
@@ -120,7 +134,10 @@ class App(ctk.CTk):
 
         self.sw_mouse = ctk.CTkSwitch(dir_, text="Controlar o mouse (bot joga)")
         self.sw_mouse.select()
-        self.sw_mouse.pack(padx=16, pady=(14, 4), anchor="w")
+        self.sw_mouse.pack(padx=16, pady=(14, 2), anchor="w")
+
+        self.sw_auto = ctk.CTkSwitch(dir_, text="Pescar sozinho (arremessa e fisga)")
+        self.sw_auto.pack(padx=16, pady=(2, 4), anchor="w")
 
         ctk.CTkLabel(dir_, text="Zona morta (px)").pack(padx=16, pady=(12, 0), anchor="w")
         self.sl_zona = ctk.CTkSlider(dir_, from_=0, to=20, number_of_steps=20, command=self._mudou_zona)
@@ -189,9 +206,14 @@ class App(ctk.CTk):
         try:
             with open(PASTA / "config.json") as f:
                 self.região = json.load(f)
+            # região do "!" é opcional: sem ela, só o modo manual funciona
+            self.reg_mordida = self.região.get("mordida")
         except Exception:
             self.lbl_status.configure(text="⚠ calibre primeiro!")
             return
+        if self.sw_auto.get() and not self.reg_mordida:
+            self.lbl_status.configure(text="⚠ sem região do '!' — auto indisponível")
+            self.sw_auto.deselect()
         self.rodando = True
         self.estado = "esperando..."
         self.btn_iniciar.configure(text="⏸  Parar", fg_color="#a33")
@@ -280,75 +302,124 @@ class App(ctk.CTk):
         self.txt_tabela.insert("1.0", cab + sep + corpo)
         self.txt_tabela.configure(state="disabled")
 
+    # ---------- lógica do bot (rodam na thread) ----------
+    def _jogar_minigame(self, barra_y, peixe_y, segurando):
+        """Segura/solta o clique pra levar a barra verde até o peixe."""
+        if not self.sw_mouse.get():
+            self.estado = "observando"
+            return segurando
+        if peixe_y < barra_y - self.zona_morta and not segurando:
+            pydirectinput.mouseDown()   # peixe acima -> barra sobe
+            segurando = True
+        elif peixe_y > barra_y + self.zona_morta and segurando:
+            pydirectinput.mouseUp()     # peixe abaixo -> barra desce
+            segurando = False
+        self.estado = "SEGURANDO" if segurando else "soltando"
+        return segurando
+
+    def _registrar_minigame(self, dur, ctrl):
+        """Guarda o minigame que acabou. Ignora se foi curto demais (ruído)."""
+        if dur < self.duracao_minima:
+            return
+        self.capturas += 1
+        with self.stats_lock:
+            if self.pendente is not None:  # não marcado: fica como "?"
+                self.log.append({
+                    "peixe": self.ent_peixe.get().strip() or "?",
+                    "sucesso": None,
+                    "duracao": round(self.pendente["duracao"], 1),
+                    "controle": round(self.pendente["controle"], 3),
+                    "quando": datetime.now().isoformat(timespec="seconds"),
+                })
+            self.pendente = {"duracao": dur, "controle": ctrl}
+        self._salvar_log()
+        self.tabela_suja = True
+
+    def _passo_auto(self, sct, fase, t_fase):
+        """Um passo do ciclo automático. Devolve (nova_fase, novo_t_fase)."""
+        agora = time.time()
+
+        if fase is None or fase == F_MINIGAME:
+            return F_ARREMESSAR, agora
+
+        if fase == F_GUARDANDO:
+            if agora - t_fase >= ESPERA_POS:
+                pydirectinput.click()      # dispensa o popup do peixe pescado
+                time.sleep(0.3)
+                return F_ARREMESSAR, time.time()
+
+        elif fase == F_ARREMESSAR:
+            pydirectinput.mouseDown()
+            time.sleep(TEMPO_CARGA)        # segura = carrega a força
+            pydirectinput.mouseUp()        # solta = arremessa
+            return F_BOIA, time.time()
+
+        elif fase == F_BOIA:
+            if agora - t_fase >= ESPERA_BOIA:
+                return F_MORDIDA, agora
+
+        elif fase == F_MORDIDA:
+            fm = np.array(sct.grab(self.reg_mordida))[:, :, :3]
+            if detectar_mordida(fm):
+                pydirectinput.click()      # fisga!
+                return F_FISGADO, agora
+            if agora - t_fase >= TIMEOUT_MORDIDA:
+                return F_ARREMESSAR, agora  # não mordeu: joga de novo
+
+        elif fase == F_FISGADO:
+            if agora - t_fase >= TIMEOUT_FISGADO:
+                return F_ARREMESSAR, agora  # minigame não abriu: tenta de novo
+
+        return fase, t_fase
+
     # ---------- thread do bot ----------
     def _loop(self):
         segurando = False
         minigame_ativo = False
         frames, t0 = 0, time.time()
         mg_inicio = 0.0
-        mg_frames = mg_dentro = 0  # p/ medir "controle %"
-        misses = 0                 # frames seguidos sem ver barra+peixe
+        mg_frames = mg_dentro = 0   # p/ medir "controle %"
+        misses = 0                  # frames seguidos sem ver barra+peixe
+        fase, t_fase = None, time.time()
+
         try:
             with mss.mss() as sct:
                 while self.rodando:
                     frame = np.array(sct.grab(self.região))[:, :, :3].copy()
                     barra_y, barra_rect, peixe_y, peixe_rect = detectar(frame)
                     ativo = barra_y is not None and peixe_y is not None
+                    auto = bool(self.sw_auto.get()) and self.reg_mordida is not None
 
                     if ativo:
                         misses = 0
-                        if not minigame_ativo:  # começou um minigame
+                        if not minigame_ativo:      # começou um minigame
                             minigame_ativo = True
+                            fase = F_MINIGAME
                             mg_inicio = time.time()
                             mg_frames = mg_dentro = 0
-                        # peixe dentro do vão da barra verde?
-                        by, bh = barra_rect[1], barra_rect[3]
                         mg_frames += 1
-                        if by <= peixe_y <= by + bh:
+                        by, bh = barra_rect[1], barra_rect[3]
+                        if by <= peixe_y <= by + bh:   # peixe dentro da barra
                             mg_dentro += 1
-
-                        if self.sw_mouse.get():
-                            if peixe_y < barra_y - self.zona_morta and not segurando:
-                                pydirectinput.mouseDown()
-                                segurando = True
-                            elif peixe_y > barra_y + self.zona_morta and segurando:
-                                pydirectinput.mouseUp()
-                                segurando = False
-                            self.estado = "SEGURANDO" if segurando else "soltando"
-                        else:
-                            self.estado = "observando"
+                        segurando = self._jogar_minigame(barra_y, peixe_y, segurando)
                     else:
                         misses += 1
-                        # só encerra depois de vários frames seguidos sem ver nada
-                        if minigame_ativo and misses >= self.misses_p_encerrar:
-                            minigame_ativo = False
-                            dur = time.time() - mg_inicio
-                            ctrl = (mg_dentro / mg_frames) if mg_frames else 0.0
-                            if dur < self.duracao_minima:
-                                # curto demais pra ser minigame de verdade: descarta
-                                self.estado = "esperando..."
-                                if segurando:
-                                    pydirectinput.mouseUp()
-                                    segurando = False
-                                continue
-                            self.capturas += 1
-                            with self.stats_lock:
-                                # se havia um pendente não marcado, finaliza como "?"
-                                if self.pendente is not None:
-                                    self.log.append({
-                                        "peixe": self.ent_peixe.get().strip() or "?",
-                                        "sucesso": None,
-                                        "duracao": round(self.pendente["duracao"], 1),
-                                        "controle": round(self.pendente["controle"], 3),
-                                        "quando": datetime.now().isoformat(timespec="seconds"),
-                                    })
-                                self.pendente = {"duracao": dur, "controle": ctrl}
-                            self._salvar_log()
-                            self.tabela_suja = True
                         if segurando:
                             pydirectinput.mouseUp()
                             segurando = False
-                        self.estado = "marque ✓/✗" if self.pendente else "esperando..."
+
+                        if minigame_ativo and misses >= self.misses_p_encerrar:
+                            minigame_ativo = False
+                            ctrl = (mg_dentro / mg_frames) if mg_frames else 0.0
+                            self._registrar_minigame(time.time() - mg_inicio, ctrl)
+                            fase, t_fase = (F_GUARDANDO, time.time()) if auto else (None, t_fase)
+                        elif not minigame_ativo:
+                            if auto:
+                                fase, t_fase = self._passo_auto(sct, fase, t_fase)
+                                self.estado = fase
+                            else:
+                                fase = None
+                                self.estado = "marque ✓/✗" if self.pendente else "esperando..."
 
                     # overlay
                     if barra_rect:

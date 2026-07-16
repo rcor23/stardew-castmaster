@@ -41,6 +41,34 @@ PEIXE_MIN = np.array([80, 120, 120])
 PEIXE_MAX = np.array([100, 255, 255])
 AREA_MIN_PEIXE = 40
 
+# --- "!" da mordida (amarelo, acima da cabeça do personagem) ---
+# Cuidado: a BARRA DE FORÇA do arremesso também é amarela e aparece na mesma
+# área. Medido nos frames reais, as duas se separam pela forma:
+#     barra de força : ~50 x 25 px  -> proporção altura/largura ~0.5
+#     "!" da mordida :   5 x 20 px  -> proporção altura/largura ~4.0
+MORDIDA_MIN = np.array([20, 150, 180])
+MORDIDA_MAX = np.array([35, 255, 255])
+AREA_MIN_MORDIDA = 40        # menos que isso é ruído
+LARGURA_MAX_MORDIDA = 15     # mais largo que isso é a barra de força (~50px)
+PROPORCAO_MIN_MORDIDA = 2.0  # "!" tem h/w ~4.0; a barra de força ~0.5
+
+
+def detectar_mordida(frame):
+    """True se o "!" da mordida está na tela (e não a barra de força)."""
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, MORDIDA_MIN, MORDIDA_MAX)
+    contornos, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    for c in contornos:
+        x, y, w, h = cv2.boundingRect(c)
+        if w == 0 or w > LARGURA_MAX_MORDIDA:
+            continue
+        if h / w < PROPORCAO_MIN_MORDIDA:
+            continue
+        if cv2.contourArea(c) < AREA_MIN_MORDIDA:
+            continue
+        return True
+    return False
+
 
 def _maior_blob(mask, area_min):
     """Devolve (x, y, w, h) do maior contorno acima de area_min, ou None."""

@@ -24,6 +24,20 @@ Janela com botão **Calibrar**, **Iniciar/Parar**, preview ao vivo da visão do 
 switch "Controlar o mouse" (desligado = só observa, ótimo pra testar a detecção),
 sliders de ajuste fino e contador de minigames.
 
+### Pescar sozinho (modo automático)
+
+Ligue o switch **"Pescar sozinho"** e o bot faz o ciclo completo:
+arremessa → espera a boia → detecta o **"!"** da mordida → fisga → joga o
+minigame → guarda o peixe → repete.
+
+**Antes de ligar:**
+- Deixe o **cursor do mouse sobre o jogo**, apontando para onde quer pescar —
+  o bot clica na posição atual do cursor, ele não move o mouse;
+- **Não mexa no mouse nem no personagem** depois de ligar: a região do `"!"`
+  é fixa (fica logo acima da cabeça do personagem) e a trilha do minigame
+  aparece perto da boia;
+- Fique de olho na **energia**: pescar gasta stamina e o bot não sabe disso.
+
 ### Registro estatístico
 
 Na parte de baixo da janela há uma tabela de desempenho **por peixe**:
