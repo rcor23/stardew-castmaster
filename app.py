@@ -314,8 +314,16 @@ class App(ctk.CTk):
         cab = ctk.CTkFrame(self, height=56, corner_radius=0, fg_color=COR_CARTAO)
         cab.pack(side="top", fill="x")
         cab.pack_propagate(False)
-        ctk.CTkLabel(cab, text="🎣  Stardew CastMaster",
-                     font=ctk.CTkFont(size=19, weight="bold")).pack(side="left", padx=18)
+
+        # Imagem em vez do emoji 🎣: o Tk no Windows não renderiza emoji
+        # colorido, então ele virava um borrão cinza irreconhecível.
+        self.img_carinha = None
+        carinha = PASTA / "carinha.png"
+        if carinha.exists():
+            self.img_carinha = ctk.CTkImage(Image.open(carinha), size=(30, 30))
+            ctk.CTkLabel(cab, image=self.img_carinha, text="").pack(side="left", padx=(16, 0))
+        ctk.CTkLabel(cab, text="Stardew CastMaster",
+                     font=ctk.CTkFont(size=19, weight="bold")).pack(side="left", padx=(8, 18))
         self.lbl_status = ctk.CTkLabel(cab, text="parado", font=ctk.CTkFont(size=12, weight="bold"),
                                        corner_radius=12, fg_color=COR_PARADO,
                                        text_color="#ffffff", padx=14, pady=5)
