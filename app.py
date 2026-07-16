@@ -839,7 +839,7 @@ class App(ctk.CTk):
         time.sleep(dur)
         pydirectinput.mouseUp()
 
-    def _jogar_minigame(self, barra_y, peixe_y, vel, segurando):
+    def _jogar_minigame(self, barra_y, peixe_y, vel, vel_peixe, segurando):
         """Segura/solta o clique pra levar a barra verde até o peixe.
 
         Controle PREDITIVO, não liga/desliga. A barra do Stardew tem inércia
@@ -858,15 +858,23 @@ class App(ctk.CTk):
             self.estado = "observando"
             return segurando
 
-        # Um frame de detecção ruim gera velocidade absurda (o log real teve
-        # +1946px/s, prevendo a barra em 1406 numa trilha de 575px). Limita a
-        # previsão à trilha para que um glitch não vire uma decisão maluca.
+        # Prevê a barra E o peixe. Prever só a barra tratava o peixe como se
+        # estivesse parado: quando a barra subia rápido atrás de um peixe que
+        # continuava subindo, o bot achava que ia passar dele e soltava — aí
+        # perdia a inércia, tinha que reacelerar do zero, e o peixe escapava.
+        # É o caso "o peixe subiu muito e a barra não acompanhou".
         prevista = barra_y + vel * self.antecipacao
-        prevista = max(0.0, min(float(self.altura_trilha), prevista))
-        if peixe_y < prevista - self.zona_morta and not segurando:
+        alvo = peixe_y + vel_peixe * self.antecipacao
+        # Um frame de detecção ruim gera velocidade absurda (o log real teve
+        # +1946px/s, prevendo a barra em 1406 numa trilha de 575px). Limita as
+        # duas previsões à trilha para que um glitch não vire decisão maluca.
+        lim = float(self.altura_trilha)
+        prevista = max(0.0, min(lim, prevista))
+        alvo = max(0.0, min(lim, alvo))
+        if alvo < prevista - self.zona_morta and not segurando:
             pydirectinput.mouseDown()   # vai parar abaixo do peixe -> sobe mais
             segurando = True
-        elif peixe_y > prevista + self.zona_morta and segurando:
+        elif alvo > prevista + self.zona_morta and segurando:
             pydirectinput.mouseUp()     # vai parar acima do peixe -> deixa cair
             segurando = False
         self.estado = "SEGURANDO" if segurando else "soltando"
@@ -1019,12 +1027,21 @@ class App(ctk.CTk):
                             mg_inicio = agora
                             mg_frames = mg_dentro = 0
                             barra_ant, t_ant, vel = None, agora, 0.0
+                            peixe_ant, vel_peixe = None, 0.0
                             traj_peixe = []
                             self._dbg("=== MINIGAME ABRIU ===")
 
                         # guarda a trajetória do peixe e mede no fim: substitui o
                         # nome que o jogo não conta quando o peixe escapa
                         traj_peixe.append((agora, peixe_y))
+
+                        # velocidade do peixe em tempo real, p/ o controle mirar
+                        # onde ele VAI estar (e não onde está)
+                        if peixe_ant is not None and agora > t_ant:
+                            vp = (peixe_y - peixe_ant) / (agora - t_ant)
+                            vp = max(-VEL_MAX, min(VEL_MAX, vp))
+                            vel_peixe = 0.6 * vel_peixe + 0.4 * vp
+                        peixe_ant = peixe_y
 
                         # velocidade da barra (px/s), suavizada p/ tirar ruído.
                         # Limitada porque a barra real não passa de ~450 px/s:
@@ -1039,11 +1056,13 @@ class App(ctk.CTk):
                         by, bh = barra_rect[1], barra_rect[3]
                         if by <= peixe_y <= by + bh:   # peixe dentro da barra
                             mg_dentro += 1
-                        segurando = self._jogar_minigame(barra_y, peixe_y, vel, segurando)
+                        segurando = self._jogar_minigame(barra_y, peixe_y, vel, vel_peixe, segurando)
                         if mg_frames % 15 == 0:  # amostra periódica, não polui o log
                             prev = barra_y + vel * self.antecipacao
+                            alvo = peixe_y + vel_peixe * self.antecipacao
                             self._dbg(f"  minigame: barra={barra_y} peixe={peixe_y} "
-                                      f"vel={vel:+.0f}px/s prevista={prev:.0f} "
+                                      f"vb={vel:+.0f} vp={vel_peixe:+.0f}px/s "
+                                      f"prevista={prev:.0f} alvo={alvo:.0f} "
                                       f"{'SEGURA' if segurando else 'solta'}")
                     else:
                         misses += 1
