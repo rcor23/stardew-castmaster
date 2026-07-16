@@ -60,6 +60,7 @@ class App(ctk.CTk):
         self.capturas = 0
         self.zona_morta = 6
         self.limiar = 0.55
+        self.proc_calib = None  # processo da calibração (evita abrir vários)
 
         # estatísticas
         self.stats_lock = threading.Lock()
@@ -170,10 +171,18 @@ class App(ctk.CTk):
 
     # ---------- ações ----------
     def abrir_calibracao(self):
+        # já tem uma calibração aberta? não abre outra.
+        if self.proc_calib is not None and self.proc_calib.poll() is None:
+            self.lbl_status.configure(text="calibração já está aberta")
+            return
         if self.rodando:
             self.parar()
-        subprocess.Popen([sys.executable, str(PASTA / "calibrar.py")], cwd=PASTA)
-        self.lbl_status.configure(text="calibrando (siga as janelas)...")
+        # console próprio, senão você não vê as instruções da calibração
+        flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+        self.proc_calib = subprocess.Popen(
+            [sys.executable, str(PASTA / "calibrar.py")], cwd=PASTA, creationflags=flags
+        )
+        self.lbl_status.configure(text="calibrando (siga o terminal)...")
 
     def alternar(self):
         if self.rodando:
