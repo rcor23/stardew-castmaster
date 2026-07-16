@@ -74,7 +74,9 @@ PASTA = Path(__file__).parent
 ARQ_STATS = PASTA / "estatisticas.json"
 ARQ_LOG = PASTA / "debug.log"
 ARQ_PREFS = PASTA / "preferencias.json"
-PREVIEW_MAX = (300, 420)  # tamanho máximo da preview (largura, altura)
+# A trilha do minigame é estreita e alta (~53x575), então a caixa acompanha
+# essa proporção — uma caixa larga só renderiza preto dos lados.
+PREVIEW_MAX = (110, 430)  # tamanho máximo da preview (largura, altura)
 
 pyautogui.FAILSAFE = True
 
@@ -85,12 +87,53 @@ ctk.set_default_color_theme("green")
 # ValueError no customtkinter, o que deixava o botão preso em "Parar".
 COR_BOTAO = ctk.ThemeManager.theme["CTkButton"]["fg_color"]
 
+# --- paleta ---
+COR_CARTAO = "#212936"
+COR_CARTAO_ALT = "#1a212c"
+COR_BORDA = "#3a4557"
+COR_FRACA = "#7d8ba1"
+COR_OK = "#2b7a2b"
+COR_ERRO = "#a33"
+COR_PARADO = "#4a5568"
+COR_ATIVA = "#2b7a2b"
+COR_ESPERA = "#3B8ED0"
+
+# cor do selo de status conforme a fase
+CORES_FASE = {
+    "parado": COR_PARADO,
+    F_MINIGAME: COR_ATIVA,
+    "SEGURANDO": COR_ATIVA,
+    "soltando": COR_ATIVA,
+    "observando": COR_ESPERA,
+    F_ARREMESSAR: COR_ESPERA,
+    F_BOIA: COR_ESPERA,
+    F_MORDIDA: COR_ESPERA,
+    F_FISGADO: COR_ATIVA,
+    F_GUARDANDO: COR_ESPERA,
+}
+
+
+def cor_do_status(txt):
+    """Verde = agindo, azul = esperando, cinza = parado, vermelho = problema."""
+    if not txt:
+        return COR_PARADO
+    if "TRAVADO" in txt or "⚠" in txt or "ABORTADO" in txt:
+        return COR_ERRO
+    if "marque" in txt or "clique no JOGO" in txt:
+        return "#b8860b"
+    for chave, cor in CORES_FASE.items():
+        if txt.startswith(chave):
+            return cor
+    return COR_PARADO
+
 
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Stardewbot 🎣")
-        self.geometry("780x660")
+        self.title("Stardew CastMaster")
+        # Medido: o conteúdo pede 519x870. Antes a janela era mais baixa e a
+        # tabela de estatísticas ficava cortada.
+        self.geometry("640x890")
         self.resizable(False, False)
 
         # estado compartilhado com a thread do bot
@@ -155,11 +198,11 @@ class App(ctk.CTk):
         if "antecipacao" in p:
             self.antecipacao = float(p["antecipacao"])
             self.sl_ant.set(self.antecipacao)
-            self.lbl_ant.configure(text=f"{self.antecipacao:.2f}")
+            self.lbl_ant.configure(text=f"{self.antecipacao:.2f} s")
         if "zona_morta" in p:
             self.zona_morta = int(p["zona_morta"])
             self.sl_zona.set(self.zona_morta)
-            self.lbl_zona.configure(text=f"{self.zona_morta}")
+            self.lbl_zona.configure(text=f"{self.zona_morta} px")
 
     def _salvar_prefs(self):
         try:
@@ -190,77 +233,133 @@ class App(ctk.CTk):
             print("Falha ao salvar estatísticas:", e)
 
     # ---------- UI ----------
+    def _cartao(self, pai, titulo):
+        """Um bloco visual com título — agrupa controles relacionados."""
+        card = ctk.CTkFrame(pai, corner_radius=10, fg_color=COR_CARTAO)
+        card.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(card, text=titulo.upper(), font=ctk.CTkFont(size=10, weight="bold"),
+                     text_color=COR_FRACA).pack(anchor="w", padx=14, pady=(10, 2))
+        return card
+
+    def _slider(self, pai, nome, unidade, lo, hi, valor, callback, ajuda, passos=None):
+        """Slider com nome, valor e uma linha explicando o que ele faz."""
+        topo = ctk.CTkFrame(pai, fg_color="transparent")
+        topo.pack(fill="x", padx=14, pady=(6, 0))
+        ctk.CTkLabel(topo, text=nome, font=ctk.CTkFont(size=12)).pack(side="left")
+        lbl = ctk.CTkLabel(topo, text=f"{valor:g} {unidade}",
+                           font=ctk.CTkFont(size=12, weight="bold"))
+        lbl.pack(side="right")
+        sl = ctk.CTkSlider(pai, from_=lo, to=hi, number_of_steps=passos,
+                           command=callback, height=16)
+        sl.set(valor)
+        sl.pack(fill="x", padx=14, pady=(2, 0))
+        ctk.CTkLabel(pai, text=ajuda, font=ctk.CTkFont(size=10), text_color=COR_FRACA,
+                     wraplength=260, justify="left").pack(anchor="w", padx=14, pady=(1, 8))
+        return sl, lbl
+
+    def _tile(self, pai, titulo):
+        """Um quadradinho de número (minigames, fps)."""
+        t = ctk.CTkFrame(pai, corner_radius=8, fg_color=COR_CARTAO)
+        t.pack(side="left", expand=True, fill="x", padx=3)
+        valor = ctk.CTkLabel(t, text="0", font=ctk.CTkFont(size=20, weight="bold"))
+        valor.pack(pady=(8, 0))
+        ctk.CTkLabel(t, text=titulo, font=ctk.CTkFont(size=10),
+                     text_color=COR_FRACA).pack(pady=(0, 8))
+        return valor
+
     def _montar_ui(self):
-        # ===== parte de cima: preview + controles =====
-        topo = ctk.CTkFrame(self, fg_color="transparent")
-        topo.pack(side="top", fill="x", padx=12, pady=(12, 6))
+        # ===== cabeçalho =====
+        cab = ctk.CTkFrame(self, height=56, corner_radius=0, fg_color=COR_CARTAO)
+        cab.pack(side="top", fill="x")
+        cab.pack_propagate(False)
+        ctk.CTkLabel(cab, text="🎣  Stardew CastMaster",
+                     font=ctk.CTkFont(size=19, weight="bold")).pack(side="left", padx=18)
+        self.lbl_status = ctk.CTkLabel(cab, text="parado", font=ctk.CTkFont(size=12, weight="bold"),
+                                       corner_radius=12, fg_color=COR_PARADO,
+                                       text_color="#ffffff", padx=14, pady=5)
+        self.lbl_status.pack(side="right", padx=18)
 
-        esq = ctk.CTkFrame(topo)
-        esq.pack(side="left", fill="both")
-        ctk.CTkLabel(esq, text="Visão do bot").pack(pady=(8, 4))
-        self.lbl_preview = ctk.CTkLabel(esq, text="(inicie para ver)", width=PREVIEW_MAX[0], height=PREVIEW_MAX[1])
-        self.lbl_preview.pack(padx=10, pady=(0, 10))
+        corpo = ctk.CTkFrame(self, fg_color="transparent")
+        corpo.pack(side="top", fill="both", expand=True, padx=14, pady=14)
 
-        dir_ = ctk.CTkFrame(topo)
-        dir_.pack(side="right", fill="both", expand=True, padx=(12, 0))
+        # ===== coluna esquerda: o que o bot enxerga =====
+        esq = ctk.CTkFrame(corpo, corner_radius=10, fg_color=COR_CARTAO)
+        esq.pack(side="left", fill="y")
+        ctk.CTkLabel(esq, text="VISÃO DO BOT", font=ctk.CTkFont(size=10, weight="bold"),
+                     text_color=COR_FRACA).pack(pady=(12, 2))
+        moldura = ctk.CTkFrame(esq, corner_radius=6, fg_color="#000000")
+        moldura.pack(padx=12, pady=(4, 6))
+        self.lbl_preview = ctk.CTkLabel(moldura, text="inicie para ver", text_color=COR_FRACA,
+                                        width=PREVIEW_MAX[0], height=PREVIEW_MAX[1])
+        self.lbl_preview.pack(padx=4, pady=4)
+        ctk.CTkLabel(esq, text="🟩 barra    🟥 peixe", font=ctk.CTkFont(size=10),
+                     text_color=COR_FRACA).pack(pady=(0, 12))
 
-        ctk.CTkLabel(dir_, text="Stardewbot", font=ctk.CTkFont(size=22, weight="bold")).pack(pady=(14, 2))
-        self.lbl_status = ctk.CTkLabel(dir_, text="parado", font=ctk.CTkFont(size=14))
-        self.lbl_status.pack(pady=(0, 10))
+        # ===== coluna direita: controles =====
+        dir_ = ctk.CTkFrame(corpo, fg_color="transparent")
+        dir_.pack(side="right", fill="both", expand=True, padx=(14, 0))
 
-        self.btn_iniciar = ctk.CTkButton(dir_, text="▶  Iniciar", height=40, command=self.alternar)
-        self.btn_iniciar.pack(fill="x", padx=16, pady=4)
+        c1 = self._cartao(dir_, "controle")
+        self.btn_iniciar = ctk.CTkButton(c1, text="▶   Iniciar", height=42, corner_radius=8,
+                                         font=ctk.CTkFont(size=14, weight="bold"),
+                                         command=self.alternar)
+        self.btn_iniciar.pack(fill="x", padx=14, pady=(4, 6))
+        self.btn_calibrar = ctk.CTkButton(c1, text="🎯   Calibrar", height=30, corner_radius=8,
+                                          fg_color="transparent", border_width=1,
+                                          border_color=COR_BORDA, text_color=COR_FRACA,
+                                          hover_color=COR_CARTAO_ALT, command=self.abrir_calibracao)
+        self.btn_calibrar.pack(fill="x", padx=14, pady=(0, 10))
 
-        self.btn_calibrar = ctk.CTkButton(dir_, text="🎯  Calibrar", height=32, fg_color="gray30",
-                                          hover_color="gray25", command=self.abrir_calibracao)
-        self.btn_calibrar.pack(fill="x", padx=16, pady=4)
-
-        self.sw_mouse = ctk.CTkSwitch(dir_, text="Controlar o mouse (bot joga)")
+        self.sw_mouse = ctk.CTkSwitch(c1, text="Controlar o mouse", font=ctk.CTkFont(size=12))
         self.sw_mouse.select()
-        self.sw_mouse.pack(padx=16, pady=(14, 2), anchor="w")
+        self.sw_mouse.pack(padx=14, pady=(0, 6), anchor="w")
+        self.sw_auto = ctk.CTkSwitch(c1, text="Pescar sozinho (arremessa e fisga)",
+                                     font=ctk.CTkFont(size=12))
+        self.sw_auto.pack(padx=14, pady=(0, 12), anchor="w")
 
-        self.sw_auto = ctk.CTkSwitch(dir_, text="Pescar sozinho (arremessa e fisga)")
-        self.sw_auto.pack(padx=16, pady=(2, 4), anchor="w")
+        c2 = self._cartao(dir_, "ajuste fino")
+        self.sl_zona, self.lbl_zona = self._slider(
+            c2, "Zona morta", "px", 0, 20, self.zona_morta, self._mudou_zona,
+            "tolerância em volta do alvo", passos=20)
+        self.sl_ant, self.lbl_ant = self._slider(
+            c2, "Antecipação", "s", 0.0, 1.0, self.antecipacao, self._mudou_ant,
+            "mira onde a barra VAI estar — evita o efeito sanfona")
 
-        ctk.CTkLabel(dir_, text="Zona morta (px)").pack(padx=16, pady=(12, 0), anchor="w")
-        self.sl_zona = ctk.CTkSlider(dir_, from_=0, to=20, number_of_steps=20, command=self._mudou_zona)
-        self.sl_zona.set(self.zona_morta)
-        self.sl_zona.pack(fill="x", padx=16)
-        self.lbl_zona = ctk.CTkLabel(dir_, text=f"{self.zona_morta}")
-        self.lbl_zona.pack(padx=16, anchor="e")
+        tiles = ctk.CTkFrame(dir_, fg_color="transparent")
+        tiles.pack(fill="x")
+        self.tile_mg = self._tile(tiles, "minigames")
+        self.tile_fps = self._tile(tiles, "fps")
+        self.lbl_stats = ctk.CTkLabel(self, text="")   # compat: atualizado via tiles
 
-        ctk.CTkLabel(dir_, text="Antecipação (s) — evita o efeito sanfona").pack(
-            padx=16, pady=(6, 0), anchor="w")
-        self.sl_ant = ctk.CTkSlider(dir_, from_=0.0, to=1.0, command=self._mudou_ant)
-        self.sl_ant.set(self.antecipacao)
-        self.sl_ant.pack(fill="x", padx=16)
-        self.lbl_ant = ctk.CTkLabel(dir_, text=f"{self.antecipacao:.2f}")
-        self.lbl_ant.pack(padx=16, anchor="e")
-
-        self.lbl_stats = ctk.CTkLabel(dir_, text="minigames: 0   |   0 fps")
-        self.lbl_stats.pack(pady=(16, 4))
-
-        # ===== parte de baixo: registro estatístico =====
-        baixo = ctk.CTkFrame(self)
-        baixo.pack(side="top", fill="both", expand=True, padx=12, pady=(6, 6))
+        # ===== rodapé: registro estatístico =====
+        baixo = ctk.CTkFrame(self, corner_radius=10, fg_color=COR_CARTAO)
+        baixo.pack(side="bottom", fill="both", expand=True, padx=14, pady=(0, 10))
 
         linha = ctk.CTkFrame(baixo, fg_color="transparent")
-        linha.pack(fill="x", padx=10, pady=(10, 4))
-        ctk.CTkLabel(linha, text="Peixe atual:").pack(side="left")
-        self.ent_peixe = ctk.CTkEntry(linha, placeholder_text="ex.: Peixe-gato", width=150)
-        self.ent_peixe.pack(side="left", padx=(6, 12))
-        self.btn_peguei = ctk.CTkButton(linha, text="✓ Peguei", width=90, fg_color="#2b7a2b",
-                                        hover_color="#246324", command=lambda: self.marcar(True))
+        linha.pack(fill="x", padx=14, pady=(12, 6))
+        ctk.CTkLabel(linha, text="Peixe atual", font=ctk.CTkFont(size=11),
+                     text_color=COR_FRACA).pack(side="left", padx=(0, 8))
+        self.ent_peixe = ctk.CTkEntry(linha, placeholder_text="ex.: Peixe-gato", width=150,
+                                      height=30, corner_radius=8, border_color=COR_BORDA)
+        self.ent_peixe.pack(side="left", padx=(0, 14))
+        self.btn_peguei = ctk.CTkButton(linha, text="✓  Peguei", width=95, height=30,
+                                        corner_radius=8, fg_color=COR_OK, hover_color="#246324",
+                                        command=lambda: self.marcar(True))
         self.btn_peguei.pack(side="left", padx=3)
-        self.btn_escapou = ctk.CTkButton(linha, text="✗ Escapou", width=90, fg_color="#a33",
-                                        hover_color="#822", command=lambda: self.marcar(False))
+        self.btn_escapou = ctk.CTkButton(linha, text="✗  Escapou", width=95, height=30,
+                                         corner_radius=8, fg_color=COR_ERRO, hover_color="#822",
+                                         command=lambda: self.marcar(False))
         self.btn_escapou.pack(side="left", padx=3)
-        self.btn_limpar = ctk.CTkButton(linha, text="🗑 Limpar", width=80, fg_color="gray30",
-                                       hover_color="gray25", command=self.limpar_stats)
+        self.btn_limpar = ctk.CTkButton(linha, text="🗑", width=34, height=30, corner_radius=8,
+                                        fg_color="transparent", border_width=1,
+                                        border_color=COR_BORDA, text_color=COR_FRACA,
+                                        hover_color=COR_CARTAO_ALT, command=self.limpar_stats)
         self.btn_limpar.pack(side="right")
 
-        self.txt_tabela = ctk.CTkTextbox(baixo, font=ctk.CTkFont(family="Consolas", size=13), height=180)
-        self.txt_tabela.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.txt_tabela = ctk.CTkTextbox(baixo, font=ctk.CTkFont(family="Consolas", size=12),
+                                         height=150, corner_radius=8, fg_color=COR_CARTAO_ALT,
+                                         border_width=0)
+        self.txt_tabela.pack(fill="both", expand=True, padx=14, pady=(0, 12))
         self.txt_tabela.configure(state="disabled")
 
         ctk.CTkLabel(self, text="Marque ✓/✗ ao fim de cada peixe · Failsafe: mouse no canto aborta",
@@ -270,11 +369,11 @@ class App(ctk.CTk):
 
     def _mudou_zona(self, v):
         self.zona_morta = int(v)
-        self.lbl_zona.configure(text=f"{self.zona_morta}")
+        self.lbl_zona.configure(text=f"{self.zona_morta} px")
 
     def _mudou_ant(self, v):
         self.antecipacao = float(v)
-        self.lbl_ant.configure(text=f"{self.antecipacao:.2f}")
+        self.lbl_ant.configure(text=f"{self.antecipacao:.2f} s")
 
     # ---------- ações ----------
     def abrir_calibracao(self):
@@ -317,7 +416,7 @@ class App(ctk.CTk):
         self.motivo_parada = None
         self.falhas_arremesso = 0
         self.estado = "esperando..."
-        self.btn_iniciar.configure(text="⏸  Parar", fg_color="#a33")
+        self.btn_iniciar.configure(text="⏸   Parar", fg_color=COR_ERRO, hover_color="#822")
         self.thread = threading.Thread(target=self._loop, daemon=True)
         self.thread.start()
 
@@ -331,7 +430,8 @@ class App(ctk.CTk):
             pydirectinput.mouseUp()
         except Exception:
             pass
-        self.btn_iniciar.configure(text="▶  Iniciar", fg_color=COR_BOTAO)
+        self.btn_iniciar.configure(text="▶   Iniciar", fg_color=COR_BOTAO,
+                                   hover_color=ctk.ThemeManager.theme["CTkButton"]["hover_color"])
 
     def _fechar(self):
         self._salvar_prefs()
@@ -393,18 +493,22 @@ class App(ctk.CTk):
 
     def _redesenhar_tabela(self):
         linhas, total = self._resumo_por_peixe()
-        cab = f"{'Peixe':<16}{'Tent':>5}{'Sucesso':>9}{'Tempo':>8}{'Controle':>10}\n"
-        sep = "─" * 48 + "\n"
+        cab = f"  {'PEIXE':<16}{'TENT':>5}{'SUCESSO':>10}{'TEMPO':>8}{'CONTROLE':>11}\n"
+        sep = "  " + "─" * 48 + "\n"
         corpo = ""
         for peixe, n, taxa, dur, ctrl in linhas:
             nome = (peixe[:15]) if len(peixe) > 15 else peixe
-            corpo += f"{nome:<16}{n:>5}{taxa*100:>8.0f}%{dur:>7.1f}s{ctrl*100:>9.0f}%\n"
+            # medidor de desempenho (a textbox não colore células, então usa forma)
+            marca = "●" if taxa >= 0.8 else ("◐" if taxa >= 0.5 else "○")
+            corpo += (f"  {nome:<16}{n:>5}{taxa*100:>9.0f}%{dur:>7.1f}s"
+                      f"{ctrl*100:>10.0f}%  {marca}\n")
         if total:
             _, n, taxa, dur, ctrl = total
             corpo += sep
-            corpo += f"{'TOTAL':<16}{n:>5}{taxa*100:>8.0f}%{dur:>7.1f}s{ctrl*100:>9.0f}%\n"
+            corpo += (f"  {'TOTAL':<16}{n:>5}{taxa*100:>9.0f}%{dur:>7.1f}s"
+                      f"{ctrl*100:>10.0f}%\n")
         if not linhas:
-            corpo = "(sem dados ainda — jogue um minigame e marque ✓ ou ✗)\n"
+            corpo = "\n   Sem dados ainda.\n   Jogue um minigame e marque ✓ Peguei ou ✗ Escapou.\n"
 
         self.txt_tabela.configure(state="normal")
         self.txt_tabela.delete("1.0", "end")
@@ -435,8 +539,7 @@ class App(ctk.CTk):
         self._print_diagnostico(sct)
         self._dbg(f"!!! TRAVADO: {self.falhas_arremesso} arremessos falharam seguidos. "
                   f"Provável INVENTÁRIO CHEIO. Parando e avisando.")
-        self.motivo_parada = ("⚠ TRAVADO — inventário cheio?\n"
-                              "veja falha_arremesso.png")
+        self.motivo_parada = "⚠ TRAVADO — inventário cheio? · veja falha_arremesso.png"
         self.rodando = False           # encerra o loop
         for _ in range(6):             # alarme: você está no jogo, não vê a tela do bot
             bipe(1200, 200)
@@ -692,11 +795,10 @@ class App(ctk.CTk):
         # refresh continue. Sem isso um erro isolado mata a UI inteira — foi o
         # que aconteceu quando parar() lançava e a janela travava.
         try:
-            if self.motivo_parada:
-                self.lbl_status.configure(text=self.motivo_parada, text_color="#ff6b6b")
-            else:
-                self.lbl_status.configure(text=self.estado, text_color=("gray10", "gray90"))
-            self.lbl_stats.configure(text=f"minigames: {self.capturas}   |   {self.fps} fps")
+            txt = self.motivo_parada or self.estado
+            self.lbl_status.configure(text=txt, fg_color=cor_do_status(txt))
+            self.tile_mg.configure(text=str(self.capturas))
+            self.tile_fps.configure(text=str(self.fps))
             if not self.rodando and self.btn_iniciar.cget("text").startswith("⏸"):
                 self.parar()
 
