@@ -32,6 +32,16 @@ import mss
 
 from imgio import imwrite_u
 
+try:
+    import winsound
+
+    def bipe(freq, ms):
+        winsound.Beep(freq, ms)
+except Exception:  # não-Windows: ignora
+    def bipe(freq, ms):
+        pass
+
+
 PASTA = Path(__file__).parent
 
 DURACAO = 25       # segundos capturando (tempo pra você fisgar)
@@ -122,12 +132,20 @@ def main():
         print("   2. Jogar a vara e fisgar um peixe;")
         print("   3. Deixar o minigame na tela.")
         print(" Não precisa clicar em nada — eu tiro os prints sozinho.")
+        print()
+        print(" AVISOS SONOROS:")
+        print("   1 bipe agudo   = começou a capturar (pode pescar)")
+        print("   3 bipes graves = acabou (volte aqui para escolher o print)")
         print("=" * 62)
         input(" Aperte ENTER para começar a contagem... ")
 
-        print("\n Vai! Volta pro jogo e fisga um peixe!\n")
-        time.sleep(1.5)
+        print("\n Volte pro jogo! Capturando em 3 segundos...\n")
+        time.sleep(3)
+        bipe(880, 150)  # 1 bipe agudo = começou
         frames = capturar_frames(sct, monitor)
+        for _ in range(3):  # 3 bipes graves = acabou
+            bipe(440, 180)
+            time.sleep(0.06)
 
         if not frames:
             print("Nenhum print capturado. Cancelado.")

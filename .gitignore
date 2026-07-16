@@ -16,3 +16,9 @@ venv/
 *.swp
 Thumbs.db
 .DS_Store
+
+# diagnostico
+amostras/
+mosaico.png
+seq.png
+frame_zoom.png
