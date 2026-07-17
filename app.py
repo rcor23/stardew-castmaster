@@ -284,6 +284,8 @@ class App(ctk.CTk):
         # % da força do arremesso. 100% = distância máxima = +1 nível na zona
         # de pesca do jogo, o que facilita o minigame.
         self.forca = 100
+        # máximo do medidor de força, aprendido na 1ª carga (ver _soltar_no_maximo)
+        self.pico_forca = 0
         self.proc_calib = None  # processo da calibração (evita abrir vários)
         self.janela_wiki = None
         self.falhas_arremesso = 0
@@ -363,6 +365,7 @@ class App(ctk.CTk):
             self.zona_morta = int(p["zona_morta"])
             self.sl_zona.set(self.zona_morta)
             self.lbl_zona.configure(text=f"{self.zona_morta} px")
+        self.pico_forca = int(p.get("pico_forca", 0))
         if "forca" in p:
             self.forca = int(p["forca"])
             self.sl_forca.set(self.forca)
@@ -379,6 +382,7 @@ class App(ctk.CTk):
                     "zona_morta": self.zona_morta,
                     "forca": self.forca,
                     "idioma": self.prefs.get("idioma", "pt"),
+                    "pico_forca": self.pico_forca,
                     "hotkey": self.prefs.get("hotkey", HOTKEY_PADRAO),
                 }, f, indent=2)
         except Exception:
@@ -886,6 +890,37 @@ class App(ctk.CTk):
             bipe(1200, 200)
             time.sleep(0.08)
 
+    def _soltar_no_maximo(self, sct):
+        """Segura até o medidor de força bater o máximo, e devolve nesse instante.
+
+        O medidor do Stardew oscila (0 → cheio → 0 → cheio...). A 1ª versão
+        soltava quando a área amarela COMEÇAVA A DIMINUIR — mas isso é tarde por
+        construção: só dá pra saber que era o pico depois de passar dele. Com o
+        limiar de 3% + polling + o tick do jogo, saía ~90-95% de força.
+
+        Agora ele APRENDE o valor do máximo (na 1ª carga, vendo o medidor virar)
+        e nos arremessos seguintes solta assim que CHEGA nele. Sem espera, sem
+        atraso. O máximo fica salvo nas preferências.
+        """
+        pico = 0
+        alvo = self.pico_forca              # já aprendido em cargas anteriores
+        t_lim = time.time() + 3.0           # trava de segurança
+        while time.time() < t_lim:
+            n = nivel_barra_forca(np.array(sct.grab(self.reg_mordida))[:, :, :3])
+            if alvo and n >= alvo * 0.98:
+                self._dbg(f"força no máximo ({n} de {alvo}) — soltando")
+                return
+            if n > pico:
+                pico = n
+            elif pico > 0 and n < pico * 0.97:
+                break                       # virou: esse pico é o máximo
+            # sem sleep: cada milissegundo aqui vira força perdida
+        if pico > self.pico_forca:
+            self.pico_forca = pico
+            self.prefs["pico_forca"] = pico
+            self._dbg(f"máximo do medidor aprendido: {pico}px "
+                      f"(próximos arremessos soltam ao chegar nele)")
+
     def _clicar(self, dur=DUR_CLIQUE):
         """Clique que o jogo enxerga: segura o botão por alguns ticks.
 
@@ -1011,17 +1046,7 @@ class App(ctk.CTk):
                 return F_GUARDANDO, agora   # espera e tenta de novo
             # confirmou que está carregando: leva até a força desejada e solta
             if self.forca >= 99:
-                # observa a barra encher e solta no PICO: quando a área amarela
-                # começa a diminuir, o medidor passou do máximo
-                pico = 0
-                t_lim = time.time() + 2.5   # trava de segurança
-                while time.time() < t_lim:
-                    n = nivel_barra_forca(np.array(sct.grab(self.reg_mordida))[:, :, :3])
-                    if n > pico:
-                        pico = n
-                    elif pico > 0 and n < pico * 0.97:
-                        break               # começou a descer: solta já
-                    time.sleep(0.02)
+                self._soltar_no_maximo(sct)
             else:
                 time.sleep(max(0.0, TEMPO_CARGA * (self.forca / 100.0)
                                 - (time.time() - t0_carga)))
