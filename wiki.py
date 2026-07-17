@@ -2,7 +2,8 @@
 """
 Wiki de peixes — janela com todos os peixes do Stardew Valley.
 
-Os dados vêm de peixes.json, extraído da tabela oficial do wiki.
+Os dados vêm de peixes.json, extraído da tabela oficial do wiki. Cada campo de
+texto guarda os dois idiomas em [pt, en]; qual aparece depende de idiomas.py.
 
 O que faz essa wiki valer mais que abrir o site: além de local/estação/hora/
 clima, ela mostra a DIFICULDADE e o TIPO DE MOVIMENTO de cada peixe — que é
@@ -15,6 +16,8 @@ from pathlib import Path
 import customtkinter as ctk
 from PIL import Image
 
+from idiomas import t, idx
+
 PASTA = Path(__file__).parent
 SPRITES = PASTA / "sprites"
 
@@ -26,13 +29,16 @@ COR_MOV = {
     "sinker": "#c97f27",   # tende a afundar
     "dart": "#c9453f",     # arisco: o mais difícil
 }
-EXPLICA_MOV = {
-    "smooth": "Movimento suave e previsível. O mais fácil pro bot.",
-    "mixed": "Mistura de movimentos. Comportamento padrão.",
-    "floater": "Tende a ficar na parte de cima da trilha.",
-    "sinker": "Tende a afundar para a parte de baixo.",
-    "dart": "Arranca de repente. O mais difícil pro bot acompanhar.",
+
+# selo de estação: emoji não renderiza no Tk (vira borrão), então usa letra
+# colorida — a cor é o que identifica de relance.
+COR_ESTACAO = {
+    "spring": "#5aab5a",   # verde: brotos
+    "summer": "#e0a92c",   # amarelo: sol
+    "fall": "#c96a27",     # laranja: folhas
+    "winter": "#5b9bd5",   # azul: gelo
 }
+ORDEM_ESTACOES = ["spring", "summer", "fall", "winter"]
 
 
 def slug(nome):
@@ -57,7 +63,7 @@ class Wiki(ctk.CTkToplevel):
         super().__init__(pai)
         self.c = cores
         self.stats = stats or []
-        self.title("Peixes do Stardew Valley")
+        self.title(t("wiki_titulo"))
         self.geometry("880x620")
         self.configure(fg_color=self.c["fundo"])
 
@@ -83,6 +89,18 @@ class Wiki(ctk.CTkToplevel):
             except Exception:
                 pass
 
+    def _carregar(self):
+        try:
+            with open(PASTA / "peixes.json", encoding="utf-8") as f:
+                return json.load(f)["peixes"]
+        except Exception:
+            return []
+
+    def _txt(self, p, campo):
+        """Campo [pt, en] do peixe, na língua atual."""
+        v = p.get(campo)
+        return v[idx()] if isinstance(v, list) else (v or "")
+
     def _sprite(self, nome, px):
         """CTkImage do peixe no tamanho pedido, ou None se não tiver sprite."""
         chave = (nome, px)
@@ -101,22 +119,13 @@ class Wiki(ctk.CTkToplevel):
         self.cache_img[chave] = img
         return img
 
-    def _carregar(self):
-        try:
-            with open(PASTA / "peixes.json", encoding="utf-8") as f:
-                dados = json.load(f)
-        except Exception:
-            return []
-        campos = dados["_campos"]
-        return [dict(zip(campos, linha)) for linha in dados["peixes"]]
-
     # ---------- UI ----------
     def _montar(self):
         c = self.c
         topo = ctk.CTkFrame(self, height=48, corner_radius=0, fg_color=c["cartao"])
         topo.pack(fill="x")
         topo.pack_propagate(False)
-        ctk.CTkLabel(topo, text="Peixes do Stardew Valley",
+        ctk.CTkLabel(topo, text=t("wiki_titulo"),
                      font=ctk.CTkFont(size=15, weight="bold")).pack(side="left", padx=16)
         self.lbl_conta = ctk.CTkLabel(topo, text="", font=ctk.CTkFont(size=11),
                                       text_color=c["fraca"])
@@ -126,11 +135,11 @@ class Wiki(ctk.CTkToplevel):
         corpo.pack(fill="both", expand=True, padx=12, pady=12)
 
         # ----- esquerda: busca + lista -----
-        esq = ctk.CTkFrame(corpo, width=290, corner_radius=10, fg_color=c["cartao"])
+        esq = ctk.CTkFrame(corpo, width=310, corner_radius=10, fg_color=c["cartao"])
         esq.pack(side="left", fill="y")
         esq.pack_propagate(False)
 
-        self.ent_busca = ctk.CTkEntry(esq, placeholder_text="buscar peixe, local, estação…",
+        self.ent_busca = ctk.CTkEntry(esq, placeholder_text=t("wiki_buscar"),
                                       height=32, corner_radius=8, border_color=c["borda"])
         self.ent_busca.pack(fill="x", padx=10, pady=(10, 6))
         self.ent_busca.bind("<KeyRelease>", lambda e: self._filtrar())
@@ -138,10 +147,20 @@ class Wiki(ctk.CTkToplevel):
         filtros = ctk.CTkFrame(esq, fg_color="transparent")
         filtros.pack(fill="x", padx=10, pady=(0, 6))
         self.filtro_mov = ctk.CTkSegmentedButton(
-            filtros, values=["todos", "dart", "sinker", "floater"],
+            filtros, values=[t("wiki_todos"), "dart", "sinker", "floater"],
             command=lambda _: self._filtrar(), font=ctk.CTkFont(size=10), height=26)
-        self.filtro_mov.set("todos")
+        self.filtro_mov.set(t("wiki_todos"))
         self.filtro_mov.pack(fill="x")
+
+        # legenda dos selos de estação
+        leg = ctk.CTkFrame(esq, fg_color="transparent")
+        leg.pack(fill="x", padx=10, pady=(0, 4))
+        for e in ORDEM_ESTACOES:
+            ctk.CTkLabel(leg, text=t(f"{e}_letra"), width=18, height=14, corner_radius=4,
+                         fg_color=COR_ESTACAO[e], text_color="#ffffff",
+                         font=ctk.CTkFont(size=8, weight="bold")).pack(side="left", padx=1)
+            ctk.CTkLabel(leg, text=t(e), font=ctk.CTkFont(size=8),
+                         text_color=c["fraca"]).pack(side="left", padx=(1, 6))
 
         self.lista = ctk.CTkScrollableFrame(esq, fg_color=c["cartao_alt"], corner_radius=8)
         self.lista.pack(fill="both", expand=True, padx=10, pady=(0, 10))
@@ -157,20 +176,21 @@ class Wiki(ctk.CTkToplevel):
         mov = self.filtro_mov.get()
         self.filtrados = [
             p for p in self.peixes
-            if (not q or q in p["nome"].lower() or q in p["local"].lower()
-                or q in p["estacao"].lower() or q in p["grupo"].lower())
-            and (mov == "todos" or p["movimento"] == mov)
+            if (not q or q in p["nome"].lower() or q in self._txt(p, "local").lower()
+                or q in self._txt(p, "estacao").lower() or q in self._txt(p, "grupo").lower())
+            and (mov == t("wiki_todos") or p["movimento"] == mov)
         ]
         self._redesenhar_lista()
 
     def _redesenhar_lista(self):
         for w in self.lista.winfo_children():
             w.destroy()
-        self.lbl_conta.configure(text=f"{len(self.filtrados)} de {len(self.peixes)} peixes")
+        self.lbl_conta.configure(text=t("wiki_conta", n=len(self.filtrados),
+                                        tot=len(self.peixes)))
         for p in self.filtrados:
             self._item(p)
         if not self.filtrados:
-            ctk.CTkLabel(self.lista, text="nada encontrado", text_color=self.c["fraca"],
+            ctk.CTkLabel(self.lista, text=t("wiki_nada"), text_color=self.c["fraca"],
                          font=ctk.CTkFont(size=11)).pack(pady=20)
 
     def _item(self, p):
@@ -184,10 +204,17 @@ class Wiki(ctk.CTkToplevel):
             font=ctk.CTkFont(size=12), command=lambda: self._escolher(p))
         b.pack(side="left", fill="x", expand=True)
         # pastilha da dificuldade: dá pra varrer a lista e achar os difíceis
-        ctk.CTkLabel(linha, text=str(p["dificuldade"]), width=30, height=20,
+        ctk.CTkLabel(linha, text=str(p["dificuldade"]), width=28, height=20,
                      corner_radius=6, fg_color=cor_dificuldade(p["dificuldade"]),
                      text_color="#ffffff",
-                     font=ctk.CTkFont(size=10, weight="bold")).pack(side="right", padx=(0, 4))
+                     font=ctk.CTkFont(size=10, weight="bold")).pack(side="right", padx=(2, 4))
+        # selos das estações, na ordem do ano
+        for e in reversed(ORDEM_ESTACOES):
+            if e in p.get("estacoes", []):
+                ctk.CTkLabel(linha, text=t(f"{e}_letra"), width=16, height=16,
+                             corner_radius=4, fg_color=COR_ESTACAO[e],
+                             text_color="#ffffff",
+                             font=ctk.CTkFont(size=8, weight="bold")).pack(side="right", padx=1)
 
     def _escolher(self, p):
         self.sel = p
@@ -207,11 +234,21 @@ class Wiki(ctk.CTkToplevel):
         nomes.pack(side="left", fill="both", expand=True)
         ctk.CTkLabel(nomes, text=p["nome"], font=ctk.CTkFont(size=24, weight="bold"),
                      anchor="w").pack(fill="x", pady=(8, 0))
-        ctk.CTkLabel(nomes, text=p["grupo"], font=ctk.CTkFont(size=11),
+        ctk.CTkLabel(nomes, text=self._txt(p, "grupo"), font=ctk.CTkFont(size=11),
                      text_color=c["fraca"], anchor="w").pack(fill="x")
+        # selos das estações também no detalhe
+        selos = ctk.CTkFrame(nomes, fg_color="transparent")
+        selos.pack(fill="x", pady=(6, 0))
+        for e in ORDEM_ESTACOES:
+            if e in p.get("estacoes", []):
+                ctk.CTkLabel(selos, text=f" {t(e)} ", height=20, corner_radius=5,
+                             fg_color=COR_ESTACAO[e], text_color="#ffffff",
+                             font=ctk.CTkFont(size=10, weight="bold")).pack(side="left", padx=2)
 
-        for rotulo, valor in [("Onde", p["local"]), ("Estação", p["estacao"]),
-                              ("Horário", p["tempo"]), ("Clima", p["clima"])]:
+        for rotulo, valor in [(t("wiki_onde"), self._txt(p, "local")),
+                              (t("wiki_estacao"), self._txt(p, "estacao")),
+                              (t("wiki_horario"), self._txt(p, "tempo")),
+                              (t("wiki_clima"), self._txt(p, "clima"))]:
             f = ctk.CTkFrame(self.dir, fg_color="transparent")
             f.pack(fill="x", padx=20, pady=3)
             ctk.CTkLabel(f, text=rotulo, width=70, anchor="w", text_color=c["fraca"],
@@ -221,12 +258,14 @@ class Wiki(ctk.CTkToplevel):
 
         # ----- o que isso significa PRO BOT -----
         ctk.CTkFrame(self.dir, height=1, fg_color=c["borda"]).pack(fill="x", padx=20, pady=14)
-        ctk.CTkLabel(self.dir, text="PARA O BOT", font=ctk.CTkFont(size=10, weight="bold"),
+        ctk.CTkLabel(self.dir, text=t("wiki_para_bot"),
+                     font=ctk.CTkFont(size=10, weight="bold"),
                      text_color=c["fraca"], anchor="w").pack(fill="x", padx=20)
 
         f = ctk.CTkFrame(self.dir, fg_color="transparent")
         f.pack(fill="x", padx=20, pady=(8, 0))
-        ctk.CTkLabel(f, text=f"  dificuldade {p['dificuldade']}  ", height=26, corner_radius=6,
+        ctk.CTkLabel(f, text=f"  {t('wiki_dificuldade', d=p['dificuldade'])}  ",
+                     height=26, corner_radius=6,
                      fg_color=cor_dificuldade(p["dificuldade"]), text_color="#ffffff",
                      font=ctk.CTkFont(size=12, weight="bold")).pack(side="left")
         ctk.CTkLabel(f, text=f"  {p['movimento']}  ", height=26, corner_radius=6,
@@ -235,25 +274,26 @@ class Wiki(ctk.CTkToplevel):
         ctk.CTkLabel(f, text=f"{p['xp']} XP", text_color=c["fraca"],
                      font=ctk.CTkFont(size=11)).pack(side="left", padx=6)
 
-        ctk.CTkLabel(self.dir, text=EXPLICA_MOV.get(p["movimento"], ""), anchor="w",
+        ctk.CTkLabel(self.dir, text=t(f"mov_{p['movimento']}"), anchor="w",
                      text_color=c["fraca"], font=ctk.CTkFont(size=11),
                      wraplength=440, justify="left").pack(fill="x", padx=20, pady=(8, 0))
 
         # ----- seu histórico com esse peixe -----
         meus = [r for r in self.stats if r.get("peixe", "").lower() == p["nome"].lower()]
         ctk.CTkFrame(self.dir, height=1, fg_color=c["borda"]).pack(fill="x", padx=20, pady=14)
-        ctk.CTkLabel(self.dir, text="SEU HISTÓRICO", font=ctk.CTkFont(size=10, weight="bold"),
+        ctk.CTkLabel(self.dir, text=t("wiki_historico"),
+                     font=ctk.CTkFont(size=10, weight="bold"),
                      text_color=c["fraca"], anchor="w").pack(fill="x", padx=20)
         if not meus:
-            ctk.CTkLabel(self.dir, text="Você ainda não registrou nenhuma tentativa neste peixe.",
-                         anchor="w", text_color=c["fraca"], font=ctk.CTkFont(size=11)).pack(
+            ctk.CTkLabel(self.dir, text=t("wiki_sem_hist"), anchor="w",
+                         text_color=c["fraca"], font=ctk.CTkFont(size=11)).pack(
                              fill="x", padx=20, pady=(8, 0))
         else:
             marcados = [r for r in meus if r.get("sucesso") is not None]
             ok = sum(1 for r in marcados if r["sucesso"])
             ctrl = sum(r["controle"] for r in meus) / len(meus)
             taxa = f"{ok/len(marcados)*100:.0f}%" if marcados else "—"
-            txt = (f"{len(meus)} tentativa(s)  ·  sucesso {taxa}  ·  "
-                   f"controle médio {ctrl*100:.0f}%")
-            ctk.CTkLabel(self.dir, text=txt, anchor="w", font=ctk.CTkFont(size=12)).pack(
-                fill="x", padx=20, pady=(8, 0))
+            ctk.CTkLabel(self.dir, text=t("wiki_hist", n=len(meus), taxa=taxa,
+                                          ctrl=f"{ctrl*100:.0f}"),
+                         anchor="w", font=ctk.CTkFont(size=12)).pack(
+                             fill="x", padx=20, pady=(8, 0))

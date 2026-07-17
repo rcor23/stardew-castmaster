@@ -35,6 +35,7 @@ from PIL import Image
 from deteccao import detectar, detectar_mordida, detectar_barra_forca, nivel_barra_forca
 from imgio import imwrite_u
 from wiki import Wiki
+from idiomas import t, set_idioma
 
 try:
     import keyboard  # hotkey global: liga/desliga sem sair do jogo
@@ -51,12 +52,13 @@ except Exception:
         pass
 
 # --- fases do ciclo automático ---
+# As fases são CHAVES de tradução, não texto: o status traduz na exibição.
 F_ARREMESSAR = "arremessando"
-F_BOIA = "esperando a boia"
-F_MORDIDA = "esperando a mordida"
-F_FISGADO = "fisgou!"
-F_MINIGAME = "MINIGAME"
-F_GUARDANDO = "guardando o peixe"
+F_BOIA = "esperando_boia"
+F_MORDIDA = "esperando_mordida"
+F_FISGADO = "fisgou"
+F_MINIGAME = "minigame"
+F_GUARDANDO = "guardando"
 
 ESPERA_INICIO = 5.0     # s após clicar em Iniciar, p/ você voltar o foco ao jogo
 # O Stardew lê o estado do botão a cada tick (~16ms). Um pydirectinput.click()
@@ -148,8 +150,11 @@ COR_ESPERA = "#3B8ED0"
 # cor do selo de status conforme a fase
 CORES_FASE = {
     "parado": COR_PARADO,
+    "esperando": COR_PARADO,
+    "pegou": COR_ATIVA,
+    "escapou_status": COR_ERRO,
     F_MINIGAME: COR_ATIVA,
-    "SEGURANDO": COR_ATIVA,
+    "segurando": COR_ATIVA,
     "soltando": COR_ATIVA,
     "observando": COR_ESPERA,
     F_ARREMESSAR: COR_ESPERA,
@@ -234,21 +239,23 @@ def classificar_peixe(vel_mediana, viradas_por_s):
         return "arisco"      # tipo dart: arranca e vira direção o tempo todo
     if vel_mediana <= VEL_PEIXE_CALMO:
         return "calmo"       # tipo smooth: previsível
-    return "médio"
+    return "medio"
 
 
-def cor_do_status(txt):
-    """Verde = agindo, azul = esperando, cinza = parado, vermelho = problema."""
-    if not txt:
+def cor_do_status(chave):
+    """Verde = agindo, azul = esperando, cinza = parado, vermelho = problema.
+
+    Recebe a CHAVE de tradução (não o texto exibido), senão a cor quebraria
+    ao trocar de idioma.
+    """
+    if not chave:
         return COR_PARADO
-    if "TRAVADO" in txt or "⚠" in txt or "ABORTADO" in txt:
+    base = chave.split("|")[0]
+    if base in ("travado", "abortado", "calibre_primeiro", "sem_regiao_mordida"):
         return COR_ERRO
-    if "marque" in txt or "clique no JOGO" in txt:
+    if base in ("marque", "clique_no_jogo"):
         return "#b8860b"
-    for chave, cor in CORES_FASE.items():
-        if txt.startswith(chave):
-            return cor
-    return COR_PARADO
+    return CORES_FASE.get(base, COR_PARADO)
 
 
 class App(ctk.CTk):
@@ -265,10 +272,11 @@ class App(ctk.CTk):
         self.thread = None
         self.frame_lock = threading.Lock()
         self.ultimo_frame = None
-        self.estado = "parado"
+        self.estado = "parado"   # CHAVE de tradução, não texto
         self.fps = 0
         self.capturas = 0
         self.prefs = self._carregar_prefs()
+        set_idioma(self.prefs.get('idioma', 'pt'))
         self.zona_morta = 6
         # segundos de antecipação do controle preditivo. A barra leva ~1.6s p/
         # reverter a queda (medido), então ~0.45s à frente evita o overshoot.
@@ -370,6 +378,7 @@ class App(ctk.CTk):
                     "antecipacao": self.antecipacao,
                     "zona_morta": self.zona_morta,
                     "forca": self.forca,
+                    "idioma": self.prefs.get("idioma", "pt"),
                     "hotkey": self.prefs.get("hotkey", HOTKEY_PADRAO),
                 }, f, indent=2)
         except Exception:
@@ -440,10 +449,16 @@ class App(ctk.CTk):
             ctk.CTkLabel(cab, image=self.img_carinha, text="").pack(side="left", padx=(16, 0))
         ctk.CTkLabel(cab, text="Stardew CastMaster",
                      font=ctk.CTkFont(size=19, weight="bold")).pack(side="left", padx=(8, 18))
-        self.lbl_status = ctk.CTkLabel(cab, text="parado", font=ctk.CTkFont(size=12, weight="bold"),
+        self.lbl_status = ctk.CTkLabel(cab, text=t("parado"),
+                                       font=ctk.CTkFont(size=12, weight="bold"),
                                        corner_radius=12, fg_color=COR_PARADO,
                                        text_color="#ffffff", padx=14, pady=5)
-        self.lbl_status.pack(side="right", padx=18)
+        self.lbl_status.pack(side="right", padx=(8, 18))
+        self.sel_idioma = ctk.CTkSegmentedButton(
+            cab, values=["PT", "EN"], width=76, height=26,
+            font=ctk.CTkFont(size=11, weight="bold"), command=self._trocar_idioma)
+        self.sel_idioma.set("EN" if self.prefs.get("idioma") == "en" else "PT")
+        self.sel_idioma.pack(side="right")
 
         corpo = ctk.CTkFrame(self, fg_color="transparent")
         corpo.pack(side="top", fill="both", expand=True, padx=14, pady=14)
@@ -451,53 +466,53 @@ class App(ctk.CTk):
         # ===== coluna esquerda: o que o bot enxerga =====
         esq = ctk.CTkFrame(corpo, corner_radius=10, fg_color=COR_CARTAO)
         esq.pack(side="left", fill="y")
-        ctk.CTkLabel(esq, text="VISÃO DO BOT", font=ctk.CTkFont(size=10, weight="bold"),
+        ctk.CTkLabel(esq, text=t("visao_bot"), font=ctk.CTkFont(size=10, weight="bold"),
                      text_color=COR_FRACA).pack(pady=(12, 2))
         moldura = ctk.CTkFrame(esq, corner_radius=6, fg_color="#000000")
         moldura.pack(padx=12, pady=(4, 6))
-        self.lbl_preview = ctk.CTkLabel(moldura, text="inicie para ver", text_color=COR_FRACA,
+        self.lbl_preview = ctk.CTkLabel(moldura, text=t("inicie_para_ver"), text_color=COR_FRACA,
                                         width=PREVIEW_MAX[0], height=PREVIEW_MAX[1])
         self.lbl_preview.pack(padx=4, pady=4)
-        ctk.CTkLabel(esq, text="🟩 barra    🟥 peixe", font=ctk.CTkFont(size=10),
+        ctk.CTkLabel(esq, text=t("legenda_cores"), font=ctk.CTkFont(size=10),
                      text_color=COR_FRACA).pack(pady=(0, 12))
 
         # ===== coluna direita: controles =====
         dir_ = ctk.CTkFrame(corpo, fg_color="transparent")
         dir_.pack(side="right", fill="both", expand=True, padx=(14, 0))
 
-        c1 = self._cartao(dir_, "controle")
-        self.btn_iniciar = ctk.CTkButton(c1, text="▶   Iniciar", height=42, corner_radius=8,
+        c1 = self._cartao(dir_, t("controle"))
+        self.btn_iniciar = ctk.CTkButton(c1, text=t("iniciar"), height=42, corner_radius=8,
                                          font=ctk.CTkFont(size=14, weight="bold"),
                                          command=self.alternar)
         self.btn_iniciar.pack(fill="x", padx=14, pady=(4, 6))
         # ⛶ = colchetes de canto; lê como "enquadrar uma área", que é o que a
         # calibração faz. Testados lado a lado: emoji (🎯) vira borrão no Tk, e
         # os círculos (◎/⦿) saem fracos e não comunicam nada.
-        self.btn_calibrar = ctk.CTkButton(c1, text="⛶   Calibrar", height=30, corner_radius=8,
+        self.btn_calibrar = ctk.CTkButton(c1, text=t("calibrar"), height=30, corner_radius=8,
                                           fg_color="transparent", border_width=1,
                                           border_color=COR_BORDA, text_color=COR_ICONE,
                                           hover_color=COR_CARTAO_ALT, command=self.abrir_calibracao)
         self.btn_calibrar.pack(fill="x", padx=14, pady=(0, 4))
 
-        self.btn_wiki = ctk.CTkButton(c1, text="≡   Peixes", height=30, corner_radius=8,
+        self.btn_wiki = ctk.CTkButton(c1, text=t("peixes_btn"), height=30, corner_radius=8,
                                       fg_color="transparent", border_width=1,
                                       border_color=COR_BORDA, text_color=COR_ICONE,
                                       hover_color=COR_CARTAO_ALT, command=self.abrir_wiki)
         self.btn_wiki.pack(fill="x", padx=14, pady=(0, 10))
 
-        self.sw_mouse = ctk.CTkSwitch(c1, text="Controlar o mouse", font=ctk.CTkFont(size=12))
+        self.sw_mouse = ctk.CTkSwitch(c1, text=t("sw_mouse"), font=ctk.CTkFont(size=12))
         self.sw_mouse.select()
         self.sw_mouse.pack(padx=14, pady=(0, 6), anchor="w")
-        self.sw_auto = ctk.CTkSwitch(c1, text="Pescar sozinho (arremessa e fisga)",
+        self.sw_auto = ctk.CTkSwitch(c1, text=t("sw_auto"),
                                      font=ctk.CTkFont(size=12))
         self.sw_auto.pack(padx=14, pady=(0, 10), anchor="w")
 
         # atalho global: liga/desliga de dentro do jogo
         lh = ctk.CTkFrame(c1, fg_color="transparent")
         lh.pack(fill="x", padx=14, pady=(0, 12))
-        ctk.CTkLabel(lh, text="Atalho (funciona dentro do jogo)",
+        ctk.CTkLabel(lh, text=t("atalho"),
                      font=ctk.CTkFont(size=11), text_color=COR_FRACA).pack(side="left")
-        self.btn_hotkey = ctk.CTkButton(lh, text="trocar", width=58, height=24,
+        self.btn_hotkey = ctk.CTkButton(lh, text=t("trocar"), width=58, height=24,
                                         corner_radius=6, fg_color="transparent",
                                         border_width=1, border_color=COR_BORDA,
                                         text_color=COR_ICONE, font=ctk.CTkFont(size=11),
@@ -508,22 +523,21 @@ class App(ctk.CTk):
                                        text_color=COR_FRACA)
         self.lbl_hotkey.pack(side="right", padx=(0, 8))
 
-        c2 = self._cartao(dir_, "ajuste fino")
+        c2 = self._cartao(dir_, t("ajuste_fino"))
         self.sl_zona, self.lbl_zona = self._slider(
-            c2, "Zona morta", "px", 0, 20, self.zona_morta, self._mudou_zona,
-            "tolerância em volta do alvo", passos=20)
+            c2, t("zona_morta"), "px", 0, 20, self.zona_morta, self._mudou_zona,
+            t("zona_morta_ajuda"), passos=20)
         self.sl_ant, self.lbl_ant = self._slider(
-            c2, "Antecipação", "s", 0.0, 1.0, self.antecipacao, self._mudou_ant,
-            "mira onde a barra VAI estar — evita o efeito sanfona")
+            c2, t("antecipacao"), "s", 0.0, 1.0, self.antecipacao, self._mudou_ant,
+            t("antecipacao_ajuda"))
         self.sl_forca, self.lbl_forca = self._slider(
-            c2, "Força do arremesso", "%", 30, 100, self.forca, self._mudou_forca,
-            "100% arremessa na distância máxima: +1 nível na zona de pesca",
-            passos=70)
+            c2, t("forca"), "%", 30, 100, self.forca, self._mudou_forca,
+            t("forca_ajuda"), passos=70)
 
         tiles = ctk.CTkFrame(dir_, fg_color="transparent")
         tiles.pack(fill="x")
-        self.tile_mg = self._tile(tiles, "minigames")
-        self.tile_fps = self._tile(tiles, "fps")
+        self.tile_mg = self._tile(tiles, t("minigames"))
+        self.tile_fps = self._tile(tiles, t("fps"))
         self.lbl_stats = ctk.CTkLabel(self, text="")   # compat: atualizado via tiles
 
         # ===== rodapé: registro estatístico =====
@@ -532,16 +546,16 @@ class App(ctk.CTk):
 
         linha = ctk.CTkFrame(baixo, fg_color="transparent")
         linha.pack(fill="x", padx=14, pady=(12, 6))
-        ctk.CTkLabel(linha, text="Peixe (opcional)", font=ctk.CTkFont(size=11),
+        ctk.CTkLabel(linha, text=t("peixe_opcional"), font=ctk.CTkFont(size=11),
                      text_color=COR_FRACA).pack(side="left", padx=(0, 8))
-        self.ent_peixe = ctk.CTkEntry(linha, placeholder_text="só se souber", width=130,
+        self.ent_peixe = ctk.CTkEntry(linha, placeholder_text=t("so_se_souber"), width=130,
                                       height=30, corner_radius=8, border_color=COR_BORDA)
         self.ent_peixe.pack(side="left", padx=(0, 14))
-        self.btn_peguei = ctk.CTkButton(linha, text="✔   Peguei", width=95, height=30,
+        self.btn_peguei = ctk.CTkButton(linha, text=t("peguei"), width=95, height=30,
                                         corner_radius=8, fg_color=COR_OK, hover_color="#246324",
                                         command=lambda: self.marcar(True))
         self.btn_peguei.pack(side="left", padx=3)
-        self.btn_escapou = ctk.CTkButton(linha, text="✖   Escapou", width=95, height=30,
+        self.btn_escapou = ctk.CTkButton(linha, text=t("escapou"), width=95, height=30,
                                          corner_radius=8, fg_color=COR_ERRO, hover_color="#822",
                                          command=lambda: self.marcar(False))
         self.btn_escapou.pack(side="left", padx=3)
@@ -553,14 +567,15 @@ class App(ctk.CTk):
         self.btn_limpar.pack(side="right")
 
         self.txt_tabela = ctk.CTkTextbox(baixo, font=ctk.CTkFont(family="Consolas", size=14),
-                                         height=170, corner_radius=8, fg_color=COR_CARTAO_ALT,
+                                         height=110, corner_radius=8, fg_color=COR_CARTAO_ALT,
                                          border_width=0, text_color="#e8ecf3",
                                          activate_scrollbars=False)
         self.txt_tabela.pack(fill="both", expand=True, padx=14, pady=(0, 12))
         self.txt_tabela.configure(state="disabled")
 
-        ctk.CTkLabel(self, text="Marque ✔/✖ ao fim de cada peixe · Failsafe: mouse no canto aborta",
-                     font=ctk.CTkFont(size=11), text_color="gray60").pack(side="bottom", pady=(0, 8))
+        self.lbl_rodape = ctk.CTkLabel(self, text=t("rodape"),
+                     font=ctk.CTkFont(size=11), text_color="gray60")
+        self.lbl_rodape.pack(side="bottom", pady=(0, 8))
 
         self.protocol("WM_DELETE_WINDOW", self._fechar)
 
@@ -576,6 +591,33 @@ class App(ctk.CTk):
         self.forca = int(v)
         self.lbl_forca.configure(text=f"{self.forca} %")
 
+    # ---------- idioma ----------
+    def _texto_status(self, chave):
+        """Traduz a chave do status. 'clique_no_jogo|4' carrega o argumento."""
+        if "|" in chave:
+            base, arg = chave.split("|", 1)
+            return t(base, s=arg)
+        return t(chave)
+
+    def _trocar_idioma(self, valor):
+        """Troca PT/EN e remonta a interface inteira."""
+        novo = "en" if valor == "EN" else "pt"
+        if novo == self.prefs.get("idioma", "pt"):
+            return
+        if self.rodando:          # não remonta widgets com a thread mexendo neles
+            self.parar()
+        self.prefs["idioma"] = novo
+        set_idioma(novo)
+        self._salvar_prefs()
+        if self.janela_wiki is not None and self.janela_wiki.winfo_exists():
+            self.janela_wiki.destroy()   # reabre já no idioma novo
+            self.janela_wiki = None
+        for w in self.winfo_children():
+            w.destroy()
+        self._montar_ui()
+        self._aplicar_prefs()
+        self.tabela_suja = True
+
     # ---------- hotkey global ----------
     def _registrar_hotkey(self, tecla):
         """Liga/desliga o bot de dentro do jogo, sem alt+tab.
@@ -584,7 +626,7 @@ class App(ctk.CTk):
         então não precisa da espera de 5s que existe pro start pelo botão.
         """
         if keyboard is None:
-            self.lbl_hotkey.configure(text="(indisponível)", text_color=COR_ERRO)
+            self.lbl_hotkey.configure(text=t("hotkey_indisp"), text_color=COR_ERRO)
             return
         try:
             if self.hotkey_atual:
@@ -603,7 +645,7 @@ class App(ctk.CTk):
             self._dbg(f"hotkey registrada: {tecla}")
         except Exception as e:
             self.hotkey_atual = None
-            self.lbl_hotkey.configure(text="tecla inválida", text_color=COR_ERRO)
+            self.lbl_hotkey.configure(text=t("tecla_invalida"), text_color=COR_ERRO)
             self._dbg(f"falha ao registrar hotkey {tecla!r}: {e}")
 
     def _toggle_hotkey(self):
@@ -616,7 +658,7 @@ class App(ctk.CTk):
         """Captura a próxima tecla que você apertar e usa como hotkey."""
         if keyboard is None:
             return
-        self.btn_hotkey.configure(text="aperte uma tecla…")
+        self.btn_hotkey.configure(text=t("aperte_tecla"))
         self.update_idletasks()
 
         def capturar():
@@ -626,12 +668,12 @@ class App(ctk.CTk):
                     ev = keyboard.read_event(suppress=False)
                 self.after(0, lambda: self._aplicar_hotkey(ev.name))
             except Exception:
-                self.after(0, lambda: self.btn_hotkey.configure(text="trocar"))
+                self.after(0, lambda: self.btn_hotkey.configure(text=t("trocar")))
 
         threading.Thread(target=capturar, daemon=True).start()
 
     def _aplicar_hotkey(self, tecla):
-        self.btn_hotkey.configure(text="trocar")
+        self.btn_hotkey.configure(text=t("trocar"))
         self._registrar_hotkey(tecla)
         self._salvar_prefs()
 
@@ -649,7 +691,7 @@ class App(ctk.CTk):
     def abrir_calibracao(self):
         # já tem uma calibração aberta? não abre outra.
         if self.proc_calib is not None and self.proc_calib.poll() is None:
-            self.lbl_status.configure(text="calibração já está aberta")
+            self.estado = "calib_aberta"
             return
         if self.rodando:
             self.parar()
@@ -658,7 +700,7 @@ class App(ctk.CTk):
         self.proc_calib = subprocess.Popen(
             [sys.executable, str(PASTA / "calibrar.py")], cwd=PASTA, creationflags=flags
         )
-        self.lbl_status.configure(text="calibrando (siga o terminal)...")
+        self.estado = "calibrando"
 
     def alternar(self):
         if self.rodando:
@@ -677,17 +719,17 @@ class App(ctk.CTk):
             self.reg_mordida = self.região.get("mordida")
             self.altura_trilha = self.região["height"]
         except Exception:
-            self.lbl_status.configure(text="⚠ calibre primeiro!")
+            self.estado = "calibre_primeiro"
             return
         if self.sw_auto.get() and not self.reg_mordida:
-            self.lbl_status.configure(text="⚠ sem região do '!' — auto indisponível")
+            self.estado = "sem_regiao_mordida"
             self.sw_auto.deselect()
         self.rodando = True
         self.via_hotkey = via_hotkey
         self.motivo_parada = None
         self.falhas_arremesso = 0
-        self.estado = "esperando..."
-        self.btn_iniciar.configure(text="⏸   Parar", fg_color=COR_ERRO, hover_color="#822")
+        self.estado = "esperando"
+        self.btn_iniciar.configure(text=t("parar"), fg_color=COR_ERRO, hover_color="#822")
         self.thread = threading.Thread(target=self._loop, daemon=True)
         self.thread.start()
 
@@ -701,7 +743,7 @@ class App(ctk.CTk):
             pydirectinput.mouseUp()
         except Exception:
             pass
-        self.btn_iniciar.configure(text="▶   Iniciar", fg_color=COR_BOTAO,
+        self.btn_iniciar.configure(text=t("iniciar"), fg_color=COR_BOTAO,
                                    hover_color=ctk.ThemeManager.theme["CTkButton"]["hover_color"])
 
     def _fechar(self):
@@ -723,7 +765,7 @@ class App(ctk.CTk):
             p = self.pendente
             self.pendente = None
         if p is None:
-            self.lbl_status.configure(text="(nenhum minigame p/ marcar)")
+            self.estado = "nada_p_marcar"
             return
         p = dict(p)
         p["sucesso"] = bool(sucesso)
@@ -791,22 +833,22 @@ class App(ctk.CTk):
                     f"{ctrl*100:>10.0f}%   {marca}\n")
 
         if not linhas:   # sem cabeçalho vazio pairando sobre nada
-            texto = ("\n   Nenhum peixe registrado ainda.\n\n"
-                     "   Escreva o nome do peixe acima, deixe o bot jogar,\n"
-                     "   e marque ✔ Peguei ou ✖ Escapou no fim de cada um.\n")
+            texto = t("sem_dados")
         else:
-            cab = f"  {'COMPORTAMENTO':<15}{'JOGOS':>5}{'SUCESSO':>9}{'TEMPO':>9}{'CONTROLE':>10}\n"
+            cab = (f"  {t('col_comportamento'):<15}{t('col_jogos'):>5}"
+                   f"{t('col_sucesso'):>9}{t('col_tempo'):>9}{t('col_controle'):>10}\n")
             sep = "  " + "─" * 52 + "\n"
             corpo = ""
             for peixe, n, taxa, dur, ctrl in linhas:
-                nome = (peixe[:14]) if len(peixe) > 14 else peixe
+                nome = t(peixe)          # "calmo"/"medio"/"arisco" -> idioma atual
+                nome = nome[:14] if len(nome) > 14 else nome
                 # medidor pelo CONTROLE (que o bot mede sozinho e sempre existe),
                 # não pela taxa de sucesso, que depende de você marcar
                 marca = "●" if ctrl >= 0.8 else ("◐" if ctrl >= 0.5 else "○")
                 corpo += fmt(nome, n, taxa, dur, ctrl, marca)
             if total:
                 _, n, taxa, dur, ctrl = total
-                corpo += sep + fmt("TOTAL", n, taxa, dur, ctrl)
+                corpo += sep + fmt(t("total"), n, taxa, dur, ctrl)
             texto = cab + sep + corpo
 
         self.txt_tabela.configure(state="normal")
@@ -838,7 +880,7 @@ class App(ctk.CTk):
         self._print_diagnostico(sct)
         self._dbg(f"!!! TRAVADO: {self.falhas_arremesso} arremessos falharam seguidos. "
                   f"Provável INVENTÁRIO CHEIO. Parando e avisando.")
-        self.motivo_parada = "⚠ TRAVADO — inventário cheio? · veja falha_arremesso.png"
+        self.motivo_parada = "travado"
         self.rodando = False           # encerra o loop
         for _ in range(6):             # alarme: você está no jogo, não vê a tela do bot
             bipe(1200, 200)
@@ -893,7 +935,7 @@ class App(ctk.CTk):
         elif alvo > prevista + self.zona_morta and segurando:
             pydirectinput.mouseUp()     # vai parar acima do peixe -> deixa cair
             segurando = False
-        self.estado = "SEGURANDO" if segurando else "soltando"
+        self.estado = "segurando" if segurando else "soltando"
         return segurando
 
     def _registrar_minigame(self, dur, ctrl, comportamento, vel_media, viradas_s):
@@ -1032,7 +1074,7 @@ class App(ctk.CTk):
             self._dbg(f"--- INICIANDO (auto). Esperando {ESPERA_INICIO}s p/ voce focar o jogo ---")
             fim_espera = time.time() + ESPERA_INICIO
             while self.rodando and time.time() < fim_espera:
-                self.estado = f"clique no JOGO! {fim_espera - time.time():.0f}s"
+                self.estado = f"clique_no_jogo|{fim_espera - time.time():.0f}"
                 time.sleep(0.1)
             if not self.rodando:      # parou durante a espera: não anuncia início
                 self._dbg("--- cancelado durante a espera ---")
@@ -1122,10 +1164,10 @@ class App(ctk.CTk):
                                 fase = None
                                 if self.pendente:
                                     r = self.pendente.get("sucesso")
-                                    self.estado = ("PEGOU ✔" if r else
-                                                   "ESCAPOU ✖" if r is False else "marque ✔/✖")
+                                    self.estado = ("pegou" if r else
+                                                   "escapou_status" if r is False else "marque")
                                 else:
-                                    self.estado = "esperando..."
+                                    self.estado = "esperando"
 
                     # overlay
                     if barra_rect:
@@ -1141,7 +1183,7 @@ class App(ctk.CTk):
                     if time.time() - t0 >= 1.0:
                         self.fps, frames, t0 = frames, 0, time.time()
         except pyautogui.FailSafeException:
-            self.estado = "ABORTADO (failsafe)"
+            self.estado = "abortado"
         finally:
             if segurando:
                 pydirectinput.mouseUp()
@@ -1158,11 +1200,12 @@ class App(ctk.CTk):
                 self.fila_hotkey.get_nowait()
                 self._toggle_hotkey()
 
-            txt = self.motivo_parada or self.estado
-            self.lbl_status.configure(text=txt, fg_color=cor_do_status(txt))
+            chave = self.motivo_parada or self.estado
+            self.lbl_status.configure(text=self._texto_status(chave),
+                                      fg_color=cor_do_status(chave))
             self.tile_mg.configure(text=str(self.capturas))
             self.tile_fps.configure(text=str(self.fps))
-            if not self.rodando and self.btn_iniciar.cget("text").startswith("⏸"):
+            if not self.rodando and self.btn_iniciar.cget("text") == t("parar"):
                 self.parar()
 
             if self.tabela_suja:

@@ -1,68 +1,1871 @@
 {
-  "_fonte": "https://stardewvalleywiki.com/Fish — extraído da tabela oficial do wiki (Stardew Valley 1.6)",
-  "_campos": ["nome", "grupo", "local", "tempo", "estacao", "clima", "dificuldade", "movimento", "xp"],
-  "_nota": "dificuldade = 15 (Carpa) a 110 (Legend). movimento = como o peixe se move no minigame: mixed, smooth, dart, sinker, floater. Os dois juntos preveem o quanto o bot vai suar.",
-  "peixes": [
-    ["Pufferfish", "Vara", "Oceano, Ilha Gengibre", "12pm – 4pm", "Verão (todas na Ilha Gengibre)", "Sol", 80, "floater", 29],
-    ["Anchovy", "Vara", "Oceano", "Qualquer hora", "Primavera, Outono", "Qualquer", 30, "dart", 13],
-    ["Tuna", "Vara", "Oceano, Ilha Gengibre", "6am – 7pm", "Verão, Inverno (todas na Ilha Gengibre)", "Qualquer", 70, "smooth", 26],
-    ["Sardine", "Vara", "Oceano", "6am – 7pm", "Primavera, Outono, Inverno", "Qualquer", 30, "dart", 13],
-    ["Bream", "Vara", "Rio da Cidade, Rio da Floresta", "6pm – 2am", "Todas", "Qualquer", 35, "smooth", 14],
-    ["Largemouth Bass", "Vara", "Lago da Montanha", "6am – 7pm", "Todas", "Qualquer", 50, "mixed", 19],
-    ["Smallmouth Bass", "Vara", "Rio da Cidade, Lagoa da Floresta", "Qualquer hora", "Primavera, Outono", "Qualquer", 28, "mixed", 12],
-    ["Rainbow Trout", "Vara", "Rio da Cidade, Rio da Floresta, Lago da Montanha", "6am – 7pm", "Verão", "Sol", 45, "mixed", 18],
-    ["Salmon", "Vara", "Rio da Cidade, Rio da Floresta, Cachoeiras", "6am – 7pm", "Outono", "Qualquer", 50, "mixed", 19],
-    ["Walleye", "Vara", "Rio da Cidade, Rio da Floresta, Lagoa, Lago da Montanha", "12pm – 2am", "Outono (Inverno com Totem de Chuva)", "Chuva", 45, "smooth", 18],
-    ["Perch", "Vara", "Rio da Cidade, Rio da Floresta, Lagoa, Lago da Montanha", "Qualquer hora", "Inverno", "Qualquer", 35, "dart", 14],
-    ["Carp", "Vara", "Lago da Montanha, Bosque Secreto, Esgotos, Covil dos Insetos", "Qualquer hora", "Todas", "Qualquer", 15, "mixed", 8],
-    ["Catfish", "Vara", "Rio da Cidade, Rio da Floresta, Bosque Secreto, Pântano da Bruxa", "6am – 12am", "Primavera, Outono (Inverno com Totem)", "Chuva", 75, "mixed", 28],
-    ["Pike", "Vara", "Rio da Cidade, Rio da Floresta, Lagoa da Floresta", "Qualquer hora", "Verão, Inverno", "Qualquer", 60, "dart", 23],
-    ["Sunfish", "Vara", "Rio da Cidade, Rio da Floresta", "6am – 7pm", "Primavera, Verão", "Sol, Vento", 30, "mixed", 13],
-    ["Red Mullet", "Vara", "Oceano", "6am – 7pm", "Verão, Inverno", "Qualquer", 55, "smooth", 21],
-    ["Herring", "Vara", "Oceano", "Qualquer hora", "Primavera, Inverno", "Qualquer", 25, "dart", 11],
-    ["Eel", "Vara", "Oceano", "4pm – 2am", "Primavera, Outono", "Chuva", 70, "smooth", 26],
-    ["Octopus", "Vara", "Oceano, Ilha Gengibre", "6am – 1pm", "Verão (todas na Ilha Gengibre)", "Qualquer", 95, "sinker", 34],
-    ["Red Snapper", "Vara", "Oceano", "6am – 7pm", "Verão, Outono (Inverno com Totem)", "Chuva", 40, "mixed", 16],
-    ["Squid", "Vara", "Oceano", "6pm – 2am", "Inverno", "Qualquer", 75, "sinker", 28],
-    ["Sea Cucumber", "Vara", "Oceano", "6am – 7pm", "Outono, Inverno", "Qualquer", 40, "sinker", 16],
-    ["Super Cucumber", "Vara", "Oceano, Ilha Gengibre", "6pm – 2am", "Verão, Outono (todas na Ilha Gengibre)", "Qualquer", 80, "sinker", 29],
-    ["Ghostfish", "Vara", "Minas (andares 20 e 60)", "Qualquer hora", "Todas", "Qualquer", 50, "mixed", 19],
-    ["Stonefish", "Vara", "Minas (andar 20)", "Qualquer hora", "Todas", "Qualquer", 65, "sinker", 24],
-    ["Ice Pip", "Vara", "Minas (andar 60)", "Qualquer hora", "Todas", "Qualquer", 85, "dart", 31],
-    ["Lava Eel", "Vara", "Minas (andar 100), Caldeira do Vulcão", "Qualquer hora", "Todas", "Qualquer", 90, "mixed", 33],
-    ["Sandfish", "Vara", "Deserto", "6am – 8pm", "Todas", "Qualquer", 65, "mixed", 24],
-    ["Scorpion Carp", "Vara", "Deserto (precisa nível 4 de pesca)", "6am – 8pm", "Todas", "Qualquer", 90, "dart", 33],
-    ["Flounder", "Vara", "Oceano, Ilha Gengibre", "6am – 8pm", "Primavera, Verão (todas na Ilha Gengibre)", "Qualquer", 50, "sinker", 19],
-    ["Midnight Carp", "Vara", "Lagoa da Floresta, Lago da Montanha, Rios da Ilha Gengibre", "10pm – 2am", "Outono, Inverno (todas na Ilha Gengibre)", "Qualquer", 55, "mixed", 21],
-    ["Sturgeon", "Vara", "Lago da Montanha", "6am – 7pm", "Verão, Inverno", "Qualquer", 78, "mixed", 29],
-    ["Tiger Trout", "Vara", "Rio da Cidade, Rio da Floresta", "6am – 7pm", "Outono, Inverno", "Qualquer", 60, "dart", 23],
-    ["Bullhead", "Vara", "Lago da Montanha", "Qualquer hora", "Todas", "Qualquer", 46, "smooth", 18],
-    ["Tilapia", "Vara", "Oceano, Rios da Ilha Gengibre", "6am – 2pm", "Verão, Outono (todas na Ilha Gengibre)", "Qualquer", 50, "mixed", 19],
-    ["Chub", "Vara", "Rio da Floresta, Lago da Montanha", "Qualquer hora", "Todas", "Qualquer", 35, "dart", 14],
-    ["Dorado", "Vara", "Rio da Floresta", "6am – 7pm", "Verão", "Qualquer", 78, "mixed", 29],
-    ["Albacore", "Vara", "Oceano", "6am – 11am, 6pm – 2am", "Outono, Inverno", "Qualquer", 60, "mixed", 23],
-    ["Shad", "Vara", "Rio da Cidade, Rio da Floresta", "9am – 2am", "Primavera, Verão, Outono", "Chuva", 45, "smooth", 18],
-    ["Lingcod", "Vara", "Rio da Cidade, Rio da Floresta, Lago da Montanha", "Qualquer hora", "Inverno", "Qualquer", 85, "mixed", 31],
-    ["Halibut", "Vara", "Oceano", "6am – 11am, 7pm – 2am", "Primavera, Verão, Inverno", "Qualquer", 50, "sinker", 19],
-    ["Woodskip", "Vara", "Bosque Secreto, Fazenda Florestal", "Qualquer hora", "Todas", "Qualquer", 50, "mixed", 19],
-    ["Void Salmon", "Vara", "Pântano da Bruxa", "Qualquer hora", "Todas", "Qualquer", 80, "mixed", 29],
-    ["Slimejack", "Vara", "Covil dos Insetos Mutantes", "Qualquer hora", "Todas", "Qualquer", 55, "dart", 21],
-    ["Stingray", "Vara", "Enseada dos Piratas (Ilha Gengibre)", "Qualquer hora", "Todas", "Qualquer", 80, "sinker", 29],
-    ["Lionfish", "Vara", "Oceanos da Ilha Gengibre", "Qualquer hora", "Todas", "Qualquer", 50, "smooth", 19],
-    ["Blue Discus", "Vara", "Rios da Ilha Gengibre", "Qualquer hora", "Todas", "Qualquer", 60, "dart", 23],
-    ["Goby", "Vara", "Cachoeiras da Floresta", "Qualquer hora", "Todas", "Qualquer", 55, "dart", 21],
-    ["Midnight Squid", "Night Market", "Submarino do Night Market", "—", "Inverno 15–17", "—", 55, "sinker", 21],
-    ["Spook Fish", "Night Market", "Submarino do Night Market", "—", "Inverno 15–17", "—", 60, "dart", 23],
-    ["Blobfish", "Night Market", "Submarino do Night Market", "—", "Inverno 15–17", "—", 75, "floater", 28],
-    ["Crimsonfish", "Lendário", "Píer Leste na Praia (precisa nível 5)", "Qualquer hora", "Verão", "Qualquer", 95, "mixed", 170],
-    ["Angler", "Lendário", "Perto da cachoeira ao norte do JojaMart (nível 3)", "Qualquer hora", "Outono", "Qualquer", 85, "smooth", 155],
-    ["Legend", "Lendário", "Lago da Montanha, perto do tronco (nível 10)", "Qualquer hora", "Primavera", "Chuva", 110, "mixed", 195],
-    ["Glacierfish", "Lendário", "Ponta sul da Ilha Ponta de Flecha, Floresta (nível 6)", "Qualquer hora", "Inverno", "Qualquer", 100, "mixed", 180],
-    ["Mutant Carp", "Lendário", "Esgotos", "Qualquer hora", "Todas", "Qualquer", 80, "dart", 145],
-    ["Son of Crimsonfish", "Lendário II", "Píer Leste na Praia (precisa nível 5)", "Qualquer hora", "Todas", "Qualquer", 95, "mixed", 34],
-    ["Ms. Angler", "Lendário II", "Perto da cachoeira ao norte do JojaMart (nível 3)", "Qualquer hora", "Todas", "Qualquer", 85, "smooth", 31],
-    ["Legend II", "Lendário II", "Lago da Montanha, perto do tronco (nível 10)", "Qualquer hora", "Todas", "Qualquer", 110, "mixed", 39],
-    ["Glacierfish Jr.", "Lendário II", "Ponta sul da Ilha Ponta de Flecha, Floresta (nível 6)", "Qualquer hora", "Todas", "Qualquer", 100, "mixed", 36],
-    ["Radioactive Carp", "Lendário II", "Esgotos", "Qualquer hora", "Todas", "Qualquer", 80, "dart", 29]
-  ]
+ "_fonte": "https://stardewvalleywiki.com/Fish — extraído da tabela oficial do wiki (Stardew Valley 1.6)",
+ "_nota": "Campos com dois valores sao [pt-BR, en]. 'estacoes' sao codigos normalizados (spring/summer/fall/winter) para os icones. dificuldade = 15 (Carp) a 110 (Legend). movimento = mixed, smooth, dart, sinker, floater.",
+ "peixes": [
+  {
+   "nome": "Pufferfish",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano, Ilha Gengibre",
+    "Ocean, Ginger Island Oceans"
+   ],
+   "tempo": [
+    "12pm – 4pm",
+    "12pm – 4pm"
+   ],
+   "estacao": [
+    "Verão (todas na Ilha Gengibre)",
+    "Summer (All Seasons on Ginger Island)"
+   ],
+   "clima": [
+    "Sol",
+    "Sun"
+   ],
+   "estacoes": [
+    "summer"
+   ],
+   "dificuldade": 80,
+   "movimento": "floater",
+   "xp": 29
+  },
+  {
+   "nome": "Anchovy",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano",
+    "Ocean"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Primavera, Outono",
+    "Spring, Fall"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "fall"
+   ],
+   "dificuldade": 30,
+   "movimento": "dart",
+   "xp": 13
+  },
+  {
+   "nome": "Tuna",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano, Ilha Gengibre",
+    "Ocean, Ginger Island Oceans"
+   ],
+   "tempo": [
+    "6am – 7pm",
+    "6am – 7pm"
+   ],
+   "estacao": [
+    "Verão, Inverno (todas na Ilha Gengibre)",
+    "Summer, Winter (All Seasons on Ginger Island)"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "summer",
+    "winter"
+   ],
+   "dificuldade": 70,
+   "movimento": "smooth",
+   "xp": 26
+  },
+  {
+   "nome": "Sardine",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano",
+    "Ocean"
+   ],
+   "tempo": [
+    "6am – 7pm",
+    "6am – 7pm"
+   ],
+   "estacao": [
+    "Primavera, Outono, Inverno",
+    "Spring, Fall, Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 30,
+   "movimento": "dart",
+   "xp": 13
+  },
+  {
+   "nome": "Bream",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Cidade, Rio da Floresta",
+    "Town River, Forest River"
+   ],
+   "tempo": [
+    "6pm – 2am",
+    "6pm – 2am"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 35,
+   "movimento": "smooth",
+   "xp": 14
+  },
+  {
+   "nome": "Largemouth Bass",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Lago da Montanha",
+    "Mountain Lake"
+   ],
+   "tempo": [
+    "6am – 7pm",
+    "6am – 7pm"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 50,
+   "movimento": "mixed",
+   "xp": 19
+  },
+  {
+   "nome": "Smallmouth Bass",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Cidade, Lagoa da Floresta",
+    "Town River, Forest Pond"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Primavera, Outono",
+    "Spring, Fall"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "fall"
+   ],
+   "dificuldade": 28,
+   "movimento": "mixed",
+   "xp": 12
+  },
+  {
+   "nome": "Rainbow Trout",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Cidade, Rio da Floresta, Lago da Montanha",
+    "Town River, Forest River, Mountain Lake"
+   ],
+   "tempo": [
+    "6am – 7pm",
+    "6am – 7pm"
+   ],
+   "estacao": [
+    "Verão",
+    "Summer"
+   ],
+   "clima": [
+    "Sol",
+    "Sun"
+   ],
+   "estacoes": [
+    "summer"
+   ],
+   "dificuldade": 45,
+   "movimento": "mixed",
+   "xp": 18
+  },
+  {
+   "nome": "Salmon",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Cidade, Rio da Floresta, Cachoeiras",
+    "Town River, Forest River, Forest Waterfalls"
+   ],
+   "tempo": [
+    "6am – 7pm",
+    "6am – 7pm"
+   ],
+   "estacao": [
+    "Outono",
+    "Fall"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "fall"
+   ],
+   "dificuldade": 50,
+   "movimento": "mixed",
+   "xp": 19
+  },
+  {
+   "nome": "Walleye",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Cidade, Rio da Floresta, Lagoa, Lago da Montanha",
+    "Town River, Forest River, Forest Pond, Mountain Lake"
+   ],
+   "tempo": [
+    "12pm – 2am",
+    "12pm – 2am"
+   ],
+   "estacao": [
+    "Outono (Inverno com Totem de Chuva)",
+    "Fall (Winter with Rain Totem)"
+   ],
+   "clima": [
+    "Chuva",
+    "Rain"
+   ],
+   "estacoes": [
+    "fall"
+   ],
+   "dificuldade": 45,
+   "movimento": "smooth",
+   "xp": 18
+  },
+  {
+   "nome": "Perch",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Cidade, Rio da Floresta, Lagoa, Lago da Montanha",
+    "Town River, Forest River, Forest Pond, Mountain Lake"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Inverno",
+    "Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "winter"
+   ],
+   "dificuldade": 35,
+   "movimento": "dart",
+   "xp": 14
+  },
+  {
+   "nome": "Carp",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Lago da Montanha, Bosque Secreto, Esgotos, Covil dos Insetos",
+    "Mountain Lake, Secret Woods, Sewers, Mutant Bug Lair"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 15,
+   "movimento": "mixed",
+   "xp": 8
+  },
+  {
+   "nome": "Catfish",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Cidade, Rio da Floresta, Bosque Secreto, Pântano da Bruxa",
+    "Town River, Forest River, Secret Woods, Witch's Swamp"
+   ],
+   "tempo": [
+    "6am – 12am",
+    "6am – 12am"
+   ],
+   "estacao": [
+    "Primavera, Outono (Inverno com Totem)",
+    "Spring, Fall (Winter with Rain Totem)"
+   ],
+   "clima": [
+    "Chuva",
+    "Rain"
+   ],
+   "estacoes": [
+    "spring",
+    "fall"
+   ],
+   "dificuldade": 75,
+   "movimento": "mixed",
+   "xp": 28
+  },
+  {
+   "nome": "Pike",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Cidade, Rio da Floresta, Lagoa da Floresta",
+    "Town River, Forest River, Forest Pond"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Verão, Inverno",
+    "Summer, Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "summer",
+    "winter"
+   ],
+   "dificuldade": 60,
+   "movimento": "dart",
+   "xp": 23
+  },
+  {
+   "nome": "Sunfish",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Cidade, Rio da Floresta",
+    "Town River, Forest River"
+   ],
+   "tempo": [
+    "6am – 7pm",
+    "6am – 7pm"
+   ],
+   "estacao": [
+    "Primavera, Verão",
+    "Spring, Summer"
+   ],
+   "clima": [
+    "Sol, Vento",
+    "Sun, Wind"
+   ],
+   "estacoes": [
+    "spring",
+    "summer"
+   ],
+   "dificuldade": 30,
+   "movimento": "mixed",
+   "xp": 13
+  },
+  {
+   "nome": "Red Mullet",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano",
+    "Ocean"
+   ],
+   "tempo": [
+    "6am – 7pm",
+    "6am – 7pm"
+   ],
+   "estacao": [
+    "Verão, Inverno",
+    "Summer, Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "summer",
+    "winter"
+   ],
+   "dificuldade": 55,
+   "movimento": "smooth",
+   "xp": 21
+  },
+  {
+   "nome": "Herring",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano",
+    "Ocean"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Primavera, Inverno",
+    "Spring, Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "winter"
+   ],
+   "dificuldade": 25,
+   "movimento": "dart",
+   "xp": 11
+  },
+  {
+   "nome": "Eel",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano",
+    "Ocean"
+   ],
+   "tempo": [
+    "4pm – 2am",
+    "4pm – 2am"
+   ],
+   "estacao": [
+    "Primavera, Outono",
+    "Spring, Fall"
+   ],
+   "clima": [
+    "Chuva",
+    "Rain"
+   ],
+   "estacoes": [
+    "spring",
+    "fall"
+   ],
+   "dificuldade": 70,
+   "movimento": "smooth",
+   "xp": 26
+  },
+  {
+   "nome": "Octopus",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano, Ilha Gengibre",
+    "Ocean, Ginger Island Oceans"
+   ],
+   "tempo": [
+    "6am – 1pm",
+    "6am – 1pm"
+   ],
+   "estacao": [
+    "Verão (todas na Ilha Gengibre)",
+    "Summer (All Seasons on Ginger Island)"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "summer"
+   ],
+   "dificuldade": 95,
+   "movimento": "sinker",
+   "xp": 34
+  },
+  {
+   "nome": "Red Snapper",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano",
+    "Ocean"
+   ],
+   "tempo": [
+    "6am – 7pm",
+    "6am – 7pm"
+   ],
+   "estacao": [
+    "Verão, Outono (Inverno com Totem)",
+    "Summer, Fall (Winter with Rain Totem)"
+   ],
+   "clima": [
+    "Chuva",
+    "Rain"
+   ],
+   "estacoes": [
+    "summer",
+    "fall"
+   ],
+   "dificuldade": 40,
+   "movimento": "mixed",
+   "xp": 16
+  },
+  {
+   "nome": "Squid",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano",
+    "Ocean"
+   ],
+   "tempo": [
+    "6pm – 2am",
+    "6pm – 2am"
+   ],
+   "estacao": [
+    "Inverno",
+    "Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "winter"
+   ],
+   "dificuldade": 75,
+   "movimento": "sinker",
+   "xp": 28
+  },
+  {
+   "nome": "Sea Cucumber",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano",
+    "Ocean"
+   ],
+   "tempo": [
+    "6am – 7pm",
+    "6am – 7pm"
+   ],
+   "estacao": [
+    "Outono, Inverno",
+    "Fall, Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 40,
+   "movimento": "sinker",
+   "xp": 16
+  },
+  {
+   "nome": "Super Cucumber",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano, Ilha Gengibre",
+    "Ocean, Ginger Island Oceans"
+   ],
+   "tempo": [
+    "6pm – 2am",
+    "6pm – 2am"
+   ],
+   "estacao": [
+    "Verão, Outono (todas na Ilha Gengibre)",
+    "Summer, Fall (All Seasons on Ginger Island)"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "summer",
+    "fall"
+   ],
+   "dificuldade": 80,
+   "movimento": "sinker",
+   "xp": 29
+  },
+  {
+   "nome": "Ghostfish",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Minas (andares 20 e 60)",
+    "Mines (Floors 20 & 60)"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 50,
+   "movimento": "mixed",
+   "xp": 19
+  },
+  {
+   "nome": "Stonefish",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Minas (andar 20)",
+    "Mines (Floor 20)"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 65,
+   "movimento": "sinker",
+   "xp": 24
+  },
+  {
+   "nome": "Ice Pip",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Minas (andar 60)",
+    "Mines (Floor 60)"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 85,
+   "movimento": "dart",
+   "xp": 31
+  },
+  {
+   "nome": "Lava Eel",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Minas (andar 100), Caldeira do Vulcão",
+    "Mines (Floor 100), Volcano Caldera"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 90,
+   "movimento": "mixed",
+   "xp": 33
+  },
+  {
+   "nome": "Sandfish",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Deserto",
+    "Desert"
+   ],
+   "tempo": [
+    "6am – 8pm",
+    "6am – 8pm"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 65,
+   "movimento": "mixed",
+   "xp": 24
+  },
+  {
+   "nome": "Scorpion Carp",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Deserto (precisa nível 4 de pesca)",
+    "Desert (requires fishing level 4)"
+   ],
+   "tempo": [
+    "6am – 8pm",
+    "6am – 8pm"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 90,
+   "movimento": "dart",
+   "xp": 33
+  },
+  {
+   "nome": "Flounder",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano, Ilha Gengibre",
+    "Ocean, Ginger Island Oceans"
+   ],
+   "tempo": [
+    "6am – 8pm",
+    "6am – 8pm"
+   ],
+   "estacao": [
+    "Primavera, Verão (todas na Ilha Gengibre)",
+    "Spring, Summer (All Seasons on Ginger Island)"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer"
+   ],
+   "dificuldade": 50,
+   "movimento": "sinker",
+   "xp": 19
+  },
+  {
+   "nome": "Midnight Carp",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Lagoa da Floresta, Lago da Montanha, Rios da Ilha Gengibre",
+    "Forest Pond, Mountain Lake, Ginger Island Rivers"
+   ],
+   "tempo": [
+    "10pm – 2am",
+    "10pm – 2am"
+   ],
+   "estacao": [
+    "Outono, Inverno (todas na Ilha Gengibre)",
+    "Fall, Winter (All Seasons on Ginger Island)"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 55,
+   "movimento": "mixed",
+   "xp": 21
+  },
+  {
+   "nome": "Sturgeon",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Lago da Montanha",
+    "Mountain Lake"
+   ],
+   "tempo": [
+    "6am – 7pm",
+    "6am – 7pm"
+   ],
+   "estacao": [
+    "Verão, Inverno",
+    "Summer, Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "summer",
+    "winter"
+   ],
+   "dificuldade": 78,
+   "movimento": "mixed",
+   "xp": 29
+  },
+  {
+   "nome": "Tiger Trout",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Cidade, Rio da Floresta",
+    "Town River, Forest River"
+   ],
+   "tempo": [
+    "6am – 7pm",
+    "6am – 7pm"
+   ],
+   "estacao": [
+    "Outono, Inverno",
+    "Fall, Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 60,
+   "movimento": "dart",
+   "xp": 23
+  },
+  {
+   "nome": "Bullhead",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Lago da Montanha",
+    "Mountain Lake"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 46,
+   "movimento": "smooth",
+   "xp": 18
+  },
+  {
+   "nome": "Tilapia",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano, Rios da Ilha Gengibre",
+    "Ocean, Ginger Island Rivers"
+   ],
+   "tempo": [
+    "6am – 2pm",
+    "6am – 2pm"
+   ],
+   "estacao": [
+    "Verão, Outono (todas na Ilha Gengibre)",
+    "Summer, Fall (All Seasons on Ginger Island)"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "summer",
+    "fall"
+   ],
+   "dificuldade": 50,
+   "movimento": "mixed",
+   "xp": 19
+  },
+  {
+   "nome": "Chub",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Floresta, Lago da Montanha",
+    "Forest River, Mountain Lake"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 35,
+   "movimento": "dart",
+   "xp": 14
+  },
+  {
+   "nome": "Dorado",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Floresta",
+    "Forest River"
+   ],
+   "tempo": [
+    "6am – 7pm",
+    "6am – 7pm"
+   ],
+   "estacao": [
+    "Verão",
+    "Summer"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "summer"
+   ],
+   "dificuldade": 78,
+   "movimento": "mixed",
+   "xp": 29
+  },
+  {
+   "nome": "Albacore",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano",
+    "Ocean"
+   ],
+   "tempo": [
+    "6am – 11am, 6pm – 2am",
+    "6am – 11am, 6pm – 2am"
+   ],
+   "estacao": [
+    "Outono, Inverno",
+    "Fall, Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 60,
+   "movimento": "mixed",
+   "xp": 23
+  },
+  {
+   "nome": "Shad",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Cidade, Rio da Floresta",
+    "Town River, Forest River"
+   ],
+   "tempo": [
+    "9am – 2am",
+    "9am – 2am"
+   ],
+   "estacao": [
+    "Primavera, Verão, Outono",
+    "Spring, Summer, Fall"
+   ],
+   "clima": [
+    "Chuva",
+    "Rain"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall"
+   ],
+   "dificuldade": 45,
+   "movimento": "smooth",
+   "xp": 18
+  },
+  {
+   "nome": "Lingcod",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rio da Cidade, Rio da Floresta, Lago da Montanha",
+    "Town River, Forest River, Mountain Lake"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Inverno",
+    "Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "winter"
+   ],
+   "dificuldade": 85,
+   "movimento": "mixed",
+   "xp": 31
+  },
+  {
+   "nome": "Halibut",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceano",
+    "Ocean"
+   ],
+   "tempo": [
+    "6am – 11am, 7pm – 2am",
+    "6am – 11am, 7pm – 2am"
+   ],
+   "estacao": [
+    "Primavera, Verão, Inverno",
+    "Spring, Summer, Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "winter"
+   ],
+   "dificuldade": 50,
+   "movimento": "sinker",
+   "xp": 19
+  },
+  {
+   "nome": "Woodskip",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Bosque Secreto, Fazenda Florestal",
+    "Secret Woods, Forest Farm"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 50,
+   "movimento": "mixed",
+   "xp": 19
+  },
+  {
+   "nome": "Void Salmon",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Pântano da Bruxa",
+    "Witch's Swamp"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 80,
+   "movimento": "mixed",
+   "xp": 29
+  },
+  {
+   "nome": "Slimejack",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Covil dos Insetos Mutantes",
+    "Mutant Bug Lair"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 55,
+   "movimento": "dart",
+   "xp": 21
+  },
+  {
+   "nome": "Stingray",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Enseada dos Piratas (Ilha Gengibre)",
+    "Pirate Cove (Ginger Island)"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 80,
+   "movimento": "sinker",
+   "xp": 29
+  },
+  {
+   "nome": "Lionfish",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Oceanos da Ilha Gengibre",
+    "Ginger Island Oceans"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 50,
+   "movimento": "smooth",
+   "xp": 19
+  },
+  {
+   "nome": "Blue Discus",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Rios da Ilha Gengibre",
+    "Ginger Island Rivers"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 60,
+   "movimento": "dart",
+   "xp": 23
+  },
+  {
+   "nome": "Goby",
+   "grupo": [
+    "Vara",
+    "Fishing Pole"
+   ],
+   "local": [
+    "Cachoeiras da Floresta",
+    "Forest Waterfalls"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 55,
+   "movimento": "dart",
+   "xp": 21
+  },
+  {
+   "nome": "Midnight Squid",
+   "grupo": [
+    "Night Market",
+    "Night Market"
+   ],
+   "local": [
+    "Submarino do Night Market",
+    "Night Market submarine"
+   ],
+   "tempo": [
+    "—",
+    "—"
+   ],
+   "estacao": [
+    "Inverno 15–17",
+    "Winter 15–17"
+   ],
+   "clima": [
+    "—",
+    "—"
+   ],
+   "estacoes": [
+    "winter"
+   ],
+   "dificuldade": 55,
+   "movimento": "sinker",
+   "xp": 21
+  },
+  {
+   "nome": "Spook Fish",
+   "grupo": [
+    "Night Market",
+    "Night Market"
+   ],
+   "local": [
+    "Submarino do Night Market",
+    "Night Market submarine"
+   ],
+   "tempo": [
+    "—",
+    "—"
+   ],
+   "estacao": [
+    "Inverno 15–17",
+    "Winter 15–17"
+   ],
+   "clima": [
+    "—",
+    "—"
+   ],
+   "estacoes": [
+    "winter"
+   ],
+   "dificuldade": 60,
+   "movimento": "dart",
+   "xp": 23
+  },
+  {
+   "nome": "Blobfish",
+   "grupo": [
+    "Night Market",
+    "Night Market"
+   ],
+   "local": [
+    "Submarino do Night Market",
+    "Night Market submarine"
+   ],
+   "tempo": [
+    "—",
+    "—"
+   ],
+   "estacao": [
+    "Inverno 15–17",
+    "Winter 15–17"
+   ],
+   "clima": [
+    "—",
+    "—"
+   ],
+   "estacoes": [
+    "winter"
+   ],
+   "dificuldade": 75,
+   "movimento": "floater",
+   "xp": 28
+  },
+  {
+   "nome": "Crimsonfish",
+   "grupo": [
+    "Lendário",
+    "Legendary"
+   ],
+   "local": [
+    "Píer Leste na Praia (precisa nível 5)",
+    "East Pier on The Beach (requires level 5)"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Verão",
+    "Summer"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "summer"
+   ],
+   "dificuldade": 95,
+   "movimento": "mixed",
+   "xp": 170
+  },
+  {
+   "nome": "Angler",
+   "grupo": [
+    "Lendário",
+    "Legendary"
+   ],
+   "local": [
+    "Perto da cachoeira ao norte do JojaMart (nível 3)",
+    "Near the waterfall north of JojaMart (level 3)"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Outono",
+    "Fall"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "fall"
+   ],
+   "dificuldade": 85,
+   "movimento": "smooth",
+   "xp": 155
+  },
+  {
+   "nome": "Legend",
+   "grupo": [
+    "Lendário",
+    "Legendary"
+   ],
+   "local": [
+    "Lago da Montanha, perto do tronco (nível 10)",
+    "Mountain Lake near the log (level 10)"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Primavera",
+    "Spring"
+   ],
+   "clima": [
+    "Chuva",
+    "Rain"
+   ],
+   "estacoes": [
+    "spring"
+   ],
+   "dificuldade": 110,
+   "movimento": "mixed",
+   "xp": 195
+  },
+  {
+   "nome": "Glacierfish",
+   "grupo": [
+    "Lendário",
+    "Legendary"
+   ],
+   "local": [
+    "Ponta sul da Ilha Ponta de Flecha, Floresta (nível 6)",
+    "South end of Arrowhead Island, Cindersap Forest (level 6)"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Inverno",
+    "Winter"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "winter"
+   ],
+   "dificuldade": 100,
+   "movimento": "mixed",
+   "xp": 180
+  },
+  {
+   "nome": "Mutant Carp",
+   "grupo": [
+    "Lendário",
+    "Legendary"
+   ],
+   "local": [
+    "Esgotos",
+    "The Sewers"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 80,
+   "movimento": "dart",
+   "xp": 145
+  },
+  {
+   "nome": "Son of Crimsonfish",
+   "grupo": [
+    "Lendário II",
+    "Legendary II"
+   ],
+   "local": [
+    "Píer Leste na Praia (precisa nível 5)",
+    "East Pier on The Beach (requires level 5)"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 95,
+   "movimento": "mixed",
+   "xp": 34
+  },
+  {
+   "nome": "Ms. Angler",
+   "grupo": [
+    "Lendário II",
+    "Legendary II"
+   ],
+   "local": [
+    "Perto da cachoeira ao norte do JojaMart (nível 3)",
+    "Near the waterfall north of JojaMart (level 3)"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 85,
+   "movimento": "smooth",
+   "xp": 31
+  },
+  {
+   "nome": "Legend II",
+   "grupo": [
+    "Lendário II",
+    "Legendary II"
+   ],
+   "local": [
+    "Lago da Montanha, perto do tronco (nível 10)",
+    "Mountain Lake near the log (level 10)"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 110,
+   "movimento": "mixed",
+   "xp": 39
+  },
+  {
+   "nome": "Glacierfish Jr.",
+   "grupo": [
+    "Lendário II",
+    "Legendary II"
+   ],
+   "local": [
+    "Ponta sul da Ilha Ponta de Flecha, Floresta (nível 6)",
+    "South end of Arrowhead Island, Cindersap Forest (level 6)"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 100,
+   "movimento": "mixed",
+   "xp": 36
+  },
+  {
+   "nome": "Radioactive Carp",
+   "grupo": [
+    "Lendário II",
+    "Legendary II"
+   ],
+   "local": [
+    "Esgotos",
+    "The Sewers"
+   ],
+   "tempo": [
+    "Qualquer hora",
+    "Anytime"
+   ],
+   "estacao": [
+    "Todas",
+    "All Seasons"
+   ],
+   "clima": [
+    "Qualquer",
+    "Any"
+   ],
+   "estacoes": [
+    "spring",
+    "summer",
+    "fall",
+    "winter"
+   ],
+   "dificuldade": 80,
+   "movimento": "dart",
+   "xp": 29
+  }
+ ]
 }
